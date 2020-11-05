@@ -138,35 +138,12 @@ impl_descriptors_producer!(f64, F64_SQLTYPE);
 // Boolean type
 impl_descriptors_producer!(bool, BOOL_SQLTYPE);
 
-// provide type descriptors for scalar types
-
-macro_rules! impl_descriptors_provider {
-    ($T:ty, $name:ident) => {
-
-        impl DescriptorsProvider for $T {
-            fn sql_descriptors() -> Vec<TypeDescriptor> {
-                vec![$name]
-            }
-        }
-    }
-}
-
-impl_descriptors_provider!(u32, U32_SQLTYPE);
-impl_descriptors_provider!(i32, I32_SQLTYPE);
-impl_descriptors_provider!(bool, BOOL_SQLTYPE);
 
 // all about String type
 
 pub fn string_sqltype(capacity: usize) -> TypeDescriptor {
     TypeDescriptor::new( SqlType::String, SQLT_CHR, capacity + 2)
 }
-
-impl DescriptorsProvider for String {
-    fn sql_descriptors() -> Vec<TypeDescriptor> {
-        vec![string_sqltype(128)]
-    }
-}
-
 
 impl TypeDescriptorProducer<String> for String {
     fn produce() -> TypeDescriptor {
@@ -182,8 +159,5 @@ impl TypeDescriptorProducer<String> for String {
 
 // TODO: inconsistency between timestamp and datetime
 use crate::dates::*;
-
-impl_descriptors_provider!(SqlDate, DATE_SQLTYPE);
-impl_descriptors_provider!(SqlDateTime, TIMESTAMP_SQLTYPE);
 
 impl_descriptors_producer!(SqlDate, DATE_SQLTYPE);

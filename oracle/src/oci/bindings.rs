@@ -262,6 +262,24 @@ extern "C" {
         mode: c_uint,
     ) -> c_int;
 }
+extern "C" {
+    pub fn OCIBindByName2(
+        stmtp: *mut OCIStmt,
+        bindp: *mut *mut OCIBind,
+        errhp: *mut OCIError,
+        placeholder: *const c_uchar,
+        placeh_len: c_int,
+        valuep: *mut c_void,
+        value_sz: c_long,
+        dty: c_ushort,
+        indp: *mut c_void,
+        alenp: *mut c_uint,
+        rcodep: *mut c_ushort,
+        maxarr_len: c_uint,
+        curelep: *mut c_uint,
+        mode: c_uint,
+    ) -> c_int;
+}
 
 extern "C" {
     pub fn OCIStmtFetch2(

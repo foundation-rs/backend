@@ -236,6 +236,27 @@ pub fn bind_by_pos(stmthp: *mut OCIStmt,
         }, Some(errhp), "oci::bind_by_pos").map(|_| handle)
 }
 
+/// creates an association between a program variable and a placeholder in a SQL
+#[inline]
+pub fn bind_by_name(stmthp: *mut OCIStmt,
+                   errhp: *mut OCIError,
+                   name: &str,
+                   valuep: *mut c_void,
+                   indp: *mut c_void,
+                   size: i64,
+                   alenp: *mut u32,
+                   dtype: u16) -> Result<*mut OCIBind, OracleError> {
+    let mut handle = ptr::null_mut() as *mut OCIBind;
+
+    let name_len = name.len() as i32;
+    let name = CString::new(name).unwrap();
+
+    check_error(
+        unsafe {
+            OCIBindByName2(stmthp, &mut handle, errhp, name.as_ptr() as *const u8, name_len, valuep, size, dtype, indp, alenp, ptr::null_mut(), 1, ptr::null_mut(), OCI_DEFAULT)
+        }, Some(errhp), "oci::bind_by_name").map(|_| handle)
+}
+
 /// fetches rows from a query
 #[inline]
 pub fn stmt_fetch(stmthp: *mut OCIStmt,

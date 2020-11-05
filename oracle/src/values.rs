@@ -1,79 +1,22 @@
 use std::mem::transmute;
 use std::ptr;
+use libc;
 
-/// Contains row data for one item.
-/// Used for Result and params
-pub enum SqlValue {
-    Nil,
-    Val { valp: *const u8, len: u16 }
-}
-pub type ResultSet = Vec<SqlValue>;
-
-/// Convert row data (result) to generic user's type,
-/// ( implementor of FromResultSet )
-pub trait FromResultSet {
-    fn from_resultset(rs: &ResultSet) -> Self;
-}
-
-impl SqlValue {
-
-    #[inline]
-    pub fn new(valp: *const u8, len: u16) -> SqlValue {
-        SqlValue::Val {valp, len}
-    }
-
-    /// Convert row data to concrete optional type
-    #[inline]
-    pub fn map<U,F>(&self, f: F)
-        -> Option<U> where F: FnOnce(*const u8, u16) -> U {
-        match self {
-            SqlValue::Val {valp, len} => Some(f(*valp,*len)),
-            SqlValue::Nil => None
-        }
-    }
-
-    /// Convert row data to concrete non-optional type
-    #[inline]
-    pub fn map_or<U,F: FnOnce(*const u8, u16) -> U>(&self, default: U, f: F) -> U {
-        match self {
-            SqlValue::Val {valp, len} => f(*valp,*len),
-            SqlValue::Nil => default
-        }
-    }
-
-    /// Convert optional type to row data
-    #[inline]
-    pub fn project_optional<U, F>(param: Option<U>, f: F)
-                                  -> Self where F: FnOnce(U) -> (*const u8, u16) {
-        match param {
-            None => SqlValue::Nil,
-            Some(val) => Self::project(val, f)
-        }
-    }
-
-    /// Convert non-optional type to row data
-    #[inline]
-    pub fn project<U, F>(param: U, f: F)
-        -> Self where F: FnOnce(U) -> (*const u8, u16) {
-        let (valp, len) = f(param);
-        SqlValue::Val{valp, len}
-    }
-
-}
+use crate::statement::{ParamValue, ResultValue};
 
 // integer types, must be used only for primitive types
 
 macro_rules! from_sql_to_primitive {
     ($T:ty) => {
 
-        impl From<&SqlValue> for $T {
-            fn from(v: &SqlValue) -> $T {
+        impl From<&ResultValue> for $T {
+            fn from(v: &ResultValue) -> $T {
                 v.map_or(Default::default(),|valp,_|unsafe { transmute::<*const u8, &$T>(valp) }.to_owned())
             }
         }
 
-        impl From<&SqlValue> for Option<$T> {
-            fn from(v: &SqlValue) -> Option<$T> {
+        impl From<&ResultValue> for Option<$T> {
+            fn from(v: &ResultValue) -> Option<$T> {
                 v.map(|valp,_|unsafe { transmute::<*const u8, &$T>(valp) }.to_owned())
             }
         }
@@ -94,8 +37,8 @@ from_sql_to_primitive!(f64);
 
 // String type, in Oracle NULL String is Empty String
 
-impl From<&SqlValue> for String {
-    fn from(v: &SqlValue) -> String {
+impl From<&ResultValue> for String {
+    fn from(v: &ResultValue) -> String {
         v.map_or(String::new(),|valp,len| {
             let str_len = len as usize;
             let mut dst = Vec::with_capacity(str_len) as Vec<u8>;
@@ -109,35 +52,9 @@ impl From<&SqlValue> for String {
 }
 
 // boolean type mapped to u16 (INT TYPE IN DB), NULL is False
-impl From<&SqlValue> for bool {
-    fn from(v: &SqlValue) -> bool {
+impl From<&ResultValue> for bool {
+    fn from(v: &ResultValue) -> bool {
         v.map_or(false,|valp,_| unsafe { transmute::<*const u8, &bool>(valp) }.to_owned())
-    }
-}
-
-// impl metainfo for singular primitive types
-
-macro_rules! impl_from_resultset {
-    ($T:ty) => {
-
-        impl FromResultSet for $T {
-            fn from_resultset(rs: &ResultSet) -> Self {
-                let s0 = &(rs[0]);
-                s0.into()
-            }
-        }
-
-    }
-}
-
-impl_from_resultset!(u32);
-impl_from_resultset!(i32);
-impl_from_resultset!(bool);
-
-impl FromResultSet for String {
-    fn from_resultset(rs: &ResultSet) -> Self {
-        let s0 = &(rs[0]);
-        s0.into()
     }
 }
 
@@ -148,8 +65,8 @@ use crate::dates::*;
 // TODO: Datetime have 7 bytes
 // TODO: Timestamp have 11 bytes
 
-impl From<&SqlValue> for SqlDate {
-    fn from(v: &SqlValue) -> SqlDate {
+impl From<&ResultValue> for SqlDate {
+    fn from(v: &ResultValue) -> SqlDate {
         v.map_or(Local::now().date(),|valp,len| {
             assert!(len == 7, "Oracle Date length must be 7 bypes");
             let vec = unsafe { transmute::<*const u8, &[u8; 7]>(valp) };
@@ -163,8 +80,8 @@ impl From<&SqlValue> for SqlDate {
     }
 }
 
-impl From<&SqlValue> for SqlDateTime {
-    fn from(v: &SqlValue) -> SqlDateTime {
+impl From<&ResultValue> for SqlDateTime {
+    fn from(v: &ResultValue) -> SqlDateTime {
         v.map_or(Local::now(),|valp,len| {
             assert!(len == 11, "Oracle Date length must be 11 bypes");
             let vec = unsafe { transmute::<*const u8, &[u8; 11]>(valp) };
@@ -181,8 +98,5 @@ impl From<&SqlValue> for SqlDateTime {
         })
     }
 }
-
-impl_from_resultset!(SqlDate);
-impl_from_resultset!(SqlDateTime);
 
 // TODO: optional converters for date and datetime

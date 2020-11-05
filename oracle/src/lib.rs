@@ -5,16 +5,12 @@ mod types;
 mod values;
 mod dates;
 mod statement;
+mod singulars;
 
 pub use oci::{OracleError, OracleResult};
 pub use connection::{Connection, connect};
 
 pub use dates::{SqlDate, SqlDateTime};
-
-pub use values::{
-    FromResultSet,
-    ResultSet
-};
 
 pub use types::{
     DescriptorsProvider,
@@ -22,4 +18,4 @@ pub use types::{
     TypeDescriptorProducer
 };
 
-pub use statement::{Statement, Query};
+pub use statement::{Statement, Query, ResultsProvider, ResultSet, ParamsProvider};

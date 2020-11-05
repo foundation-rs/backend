@@ -49,5 +49,6 @@ pub use functions::{
     stmt_execute,
     stmt_fetch,
     define_by_pos,
-    bind_by_pos
+    bind_by_pos,
+    bind_by_name
 };

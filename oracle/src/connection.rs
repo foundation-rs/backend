@@ -5,9 +5,6 @@ use crate::oci;
 
 use crate::environment::Environment;
 use crate::statement;
-use crate::types::DescriptorsProvider;
-use crate::values::FromResultSet;
-use crate::statement::Statement;
 
 /// Connection to Oracle and server context
 pub struct Connection {
@@ -87,11 +84,6 @@ impl Connection {
         statement::Statement::new(self, sql)
     }
 
-    /// Prepare oracle statement and create query
-    pub fn make_query<'conn,'s,R: DescriptorsProvider + FromResultSet>(&'conn self, sql: &'s str) -> Result<statement::Query<'conn,R>, oci::OracleError> {
-        let st = statement::Statement::new(self, sql)?;
-        Ok(st.define())
-    }
 }
 
 impl Drop for Connection {
