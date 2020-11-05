@@ -1,0 +1,19 @@
+[package]
+name = "oracle_derive"
+version = "0.1.0"
+authors = ["Dmitri Astafiev <demius.md@gmail.com>"]
+description = "A `cargo generate` template for quick-starting a procedural macro crate"
+keywords = ["template", "proc_macro", "procmacro"]
+edition = "2018"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+quote = "1"
+proc-macro2 = "1.0"
+syn = "1.0"
+
+[dev-dependencies]
+oracle = { version = "0.1.0", path = "../oracle" }
+

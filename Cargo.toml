@@ -1,0 +1,17 @@
+[package]
+name = "foundation"
+version = "0.1.0"
+authors = ["Dmitri Astafiev <demius.md@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+oracle = { version = "0.1.0", path = "./oracle" }
+oracle_derive = { version = "0.1.0", path = "./oracle_derive" }
+
+chrono = { version = "0.4", features = ["serde"] }
+lazy_static = "1.4.0"
+
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
