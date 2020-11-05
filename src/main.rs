@@ -39,7 +39,7 @@ pub fn load(conn: &oracle::Connection, excludes: &Vec<String>) -> Result<Vec<Ora
             &quoted_excludes.join(","));
 
     let mut result = Vec::with_capacity(8000);
-    let mut query = conn.prepare(&sql)?.query::<OraTable>()?;
+    let mut query = conn.query::<OraTable>(&sql)?;
 
     for v in query.fetch_iter()? {
         if let Ok(v) = v {

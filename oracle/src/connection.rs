@@ -4,7 +4,7 @@
 use crate::oci;
 
 use crate::environment::Environment;
-use crate::statement;
+use crate::{statement, OracleResult, ResultsProvider, ParamsProvider};
 
 /// Connection to Oracle and server context
 pub struct Connection {
@@ -84,6 +84,24 @@ impl Connection {
         statement::Statement::new(self, sql)
     }
 
+    /// Prepare query with default 10 prefetch rows
+    pub fn query<R>(&self, sql: &str)
+                    -> OracleResult<statement::Query<R>> where R: ResultsProvider {
+        statement::Statement::new(self, sql)?.query()
+    }
+
+    /// Prepare query with 10 row
+    pub fn query_one<R>(&self, sql: &str)
+                    -> OracleResult<statement::QueryOne<R>> where R: ResultsProvider {
+        statement::Statement::new(self, sql)?.query_one()
+    }
+
+    /// Prepare query with default 10 prefetch rows and params
+    pub fn query_with_params<R,P>(&self, sql: &str)
+                    -> OracleResult<statement::BindedQuery<R,P>>
+        where R: ResultsProvider, P: ParamsProvider {
+        statement::Statement::new(self, sql)?.params()?.query()
+    }
 }
 
 impl Drop for Connection {

@@ -100,7 +100,7 @@ impl <'conn> Statement<'conn> {
     }
 
     /// Prepare oracle statement with default prefetch 1 row
-    pub fn query_one<R: ResultsProvider>(self) -> OracleResult<Query<'conn,R>> {
+    pub fn query_one<R: ResultsProvider>(self) -> OracleResult<QueryOne<'conn,R>> {
         QueryOne::new(self)
     }
 
@@ -154,9 +154,9 @@ impl <'conn,R> Query<'conn,R> where R: ResultsProvider {
 }
 
 impl <'conn,R> QueryOne<'conn,R> where R: ResultsProvider {
-    fn new(stmt: Statement<'conn>) -> OracleResult<Query<'conn,R>> {
+    fn new(stmt: Statement<'conn>) -> OracleResult<QueryOne<'conn,R>> {
         let results = ResultProcessor::new(stmt.conn, stmt.stmthp, 1)?;
-        Ok( Query { stmt, results, _result: PhantomData })
+        Ok( QueryOne { stmt, results, _result: PhantomData })
     }
 
     #[inline]
@@ -179,8 +179,8 @@ impl <'conn,P> BindedStatement<'conn,P> where P: ParamsProvider {
     }
 
     /// Prepare oracle statement with default prefetch 1 row
-    pub fn query_one<R: ResultsProvider>(self) -> OracleResult<BindedQuery<'conn,R, P>> {
-        BindedQuery::new(self, 1)
+    pub fn query_one<R: ResultsProvider>(self) -> OracleResult<BindedQueryOne<'conn,R, P>> {
+        BindedQueryOne::new(self)
     }
 
     /// Prepare oracle statement with default prefetch 1 row
@@ -226,8 +226,19 @@ impl <'conn,R, P> BindedQuery<'conn,R, P> where R: ResultsProvider,
         self.results.fetch_list()
     }
 
+}
+
+impl <'conn,R, P> BindedQueryOne<'conn,R, P> where R: ResultsProvider,
+                                                   P: ParamsProvider {
+    fn new(binded_stmt: BindedStatement<'conn,P>) -> OracleResult<BindedQueryOne<'conn,R, P>> {
+        let stmt = binded_stmt.stmt;
+        let results = ResultProcessor::new(stmt.conn, stmt.stmthp, 1)?;
+        let params = binded_stmt.params;
+        Ok( BindedQueryOne { stmt, results, params, _result: PhantomData, _params: PhantomData })
+    }
+
     #[inline]
-    pub fn fetch_one(&mut self, params: P) -> Result<R, oci::OracleError> {
+    pub fn fetch(&mut self, params: P) -> OracleResult<R> {
         params.project_values(&mut self.params.projection);
         self.stmt.execute()?;
         self.results.fetch_one()
