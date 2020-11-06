@@ -21,6 +21,10 @@ pub use types::{
 pub use statement::{
     Statement,
     Query,
+    BindedStatement,
+    BindedQuery,
+    QueryOne,
+    BindedQueryOne,
     ResultsProvider,
     ResultSet,
     ParamsProvider,

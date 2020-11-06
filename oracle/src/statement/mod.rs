@@ -211,14 +211,14 @@ impl <'conn,R, P> BindedQuery<'conn,R, P> where R: ResultsProvider,
     }
 
     #[inline]
-    pub fn fetch_iter<'iter>(&'iter mut self, params: P) -> Result<QueryIterator<'iter, 'conn, R>, oci::OracleError> {
+    pub fn fetch_iter<'iter>(&'iter mut self, params: &P) -> Result<QueryIterator<'iter, 'conn, R>, oci::OracleError> {
         params.project_values(&mut self.params.projection);
         self.stmt.execute()?;
         self.results.fetch_iter()
     }
 
     #[inline]
-    pub fn fetch_list(&mut self, params: P) -> Result<Vec<R>, oci::OracleError> {
+    pub fn fetch_list(&mut self, params: &P) -> Result<Vec<R>, oci::OracleError> {
         params.project_values(&mut self.params.projection);
         self.stmt.execute()?;
         self.results.fetch_list()
