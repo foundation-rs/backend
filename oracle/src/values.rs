@@ -3,10 +3,11 @@ use std::ptr;
 use libc;
 
 use crate::statement::{ParamValue, ResultValue};
+use crate::ValueProjector;
 
 // integer types, must be used only for primitive types
 
-macro_rules! from_sql_to_primitive {
+macro_rules! convert_sql_and_primitive {
     ($T:ty) => {
 
         impl From<&ResultValue> for $T {
@@ -21,19 +22,31 @@ macro_rules! from_sql_to_primitive {
             }
         }
 
+        impl ValueProjector<$T> for $T {
+            fn project_value(&self, projection: &mut ParamValue) {
+                projection.project(self, |val, data, _| {
+                    unsafe {
+                        *( transmute::<*mut u8, &mut $T>(data) ) = *val;
+                        0
+                    }
+                });
+            }
+        }
+
     }
 }
 
-from_sql_to_primitive!(i16);
-from_sql_to_primitive!(u16);
+convert_sql_and_primitive!(i16);
+convert_sql_and_primitive!(u16);
 
-from_sql_to_primitive!(i32);
-from_sql_to_primitive!(u32);
+convert_sql_and_primitive!(i32);
+convert_sql_and_primitive!(u32);
 
-from_sql_to_primitive!(i64);
-from_sql_to_primitive!(u64);
+convert_sql_and_primitive!(i64);
+convert_sql_and_primitive!(u64);
 
-from_sql_to_primitive!(f64);
+convert_sql_and_primitive!(f64);
+
 
 // String type, in Oracle NULL String is Empty String
 
@@ -51,10 +64,56 @@ impl From<&ResultValue> for String {
     }
 }
 
+impl ValueProjector<String> for String {
+    fn project_value(&self, projection: &mut ParamValue) {
+        projection.project(self, |val, data, indp| {
+            let str_len = val.len();
+            unsafe {
+                if str_len == 0 {
+                    *indp = -1;
+                } else {
+                    ptr::copy(val.as_ptr(), data, str_len);
+                }
+                str_len
+            }
+        });
+    }
+}
+
+impl ValueProjector<&str> for &str {
+    fn project_value(&self, projection: &mut ParamValue) {
+        projection.project(self, |val, data, indp| {
+            let str_len = val.len();
+            unsafe {
+                if str_len == 0 {
+                    *indp = -1;
+                } else {
+                    ptr::copy(val.as_ptr(), data, str_len);
+                }
+                str_len
+            }
+        });
+    }
+}
+
 // boolean type mapped to u16 (INT TYPE IN DB), NULL is False
+
 impl From<&ResultValue> for bool {
     fn from(v: &ResultValue) -> bool {
-        v.map_or(false,|valp,_| unsafe { transmute::<*const u8, &bool>(valp) }.to_owned())
+        let int_val = v.map_or(0,|valp,_| unsafe { transmute::<*const u8, &u16>(valp) }.to_owned());
+        if int_val < 1 { false } else { true }
+    }
+}
+
+impl ValueProjector<bool> for bool {
+    fn project_value(&self, projection: &mut ParamValue) {
+        projection.project(self, |val, data, _| {
+            let val: u16 = if *self { 1 } else { 0 };
+            unsafe {
+                *( transmute::<*mut u8, &mut u16>(data) ) = val;
+                0
+            }
+        });
     }
 }
 

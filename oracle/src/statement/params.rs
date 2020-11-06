@@ -16,6 +16,7 @@ pub struct ParamValue {
     valp: *mut u8,
     indp: *mut i16,
     lenp: *mut u32,
+    size: usize
 }
 
 pub struct Member {
@@ -24,7 +25,7 @@ pub struct Member {
 }
 pub enum Identifier {
     /// A named field like `self.x`.
-    Named(String),
+    Named(&'static str),
     /// An unnamed field like `self.0`.
     Unnamed,
 }
@@ -36,48 +37,53 @@ pub trait ParamsProvider {
     fn project_values(&self, projecton: &mut ParamsProjection) -> ();
 }
 
-/*
+pub trait ValueProjector<T> {
+    fn project_value(&self, projection: &mut ParamValue);
+}
+
+impl Member {
+    pub fn new(descriptor: TypeDescriptor,identifier: Identifier) -> Self {
+        Member { descriptor, identifier }
+    }
+}
+
 impl <'a> ParamValue {
-
-    /// Convert row data to concrete optional type
-    #[inline]
-    pub fn map<U,F>(&self, f: F)
-                    -> Option<U> where F: FnOnce(*const u8, u16) -> U {
-        match self {
-            ResultValue::Val {valp, len} => Some(f(*valp, *len)),
-            ResultValue::Nil => None
-        }
-    }
-
-    /// Convert row data to concrete non-optional type
-    #[inline]
-    pub fn map_or<U,F: FnOnce(*const u8, u16) -> U>(&self, default: U, f: F) -> U {
-        match self {
-            ResultValue::Val {valp, len} => f(*valp, *len),
-            ResultValue::Nil => default
-        }
-    }
 
     /// Convert optional type to row data
     #[inline]
-    pub fn project_optional<U, F>(&mut self, param: Option<U>, f: F)
-                                  -> Self where F: FnOnce(U) -> (*const u8, u16) {
-        match param {
-            None => ResultValue::Nil,
-            Some(val) => Self::project(val, f)
-        }
+    pub fn project_optional<U, F>(&mut self, param: &Option<U>, f: F)
+                                  -> () where F: FnOnce(&U, *mut u8, *mut i16) -> usize {
+        unsafe {
+            match param {
+                None => {
+                    *self.indp = -1;
+                },
+                Some(val) => {
+                    *self.indp = 0;
+                    self.project(val, f);
+                }
+            }
+        };
     }
 
     /// Convert non-optional type to row data
     #[inline]
-    pub fn project<U, F>(param: U, f: F)
-                         -> Self where F: FnOnce(U) -> (*const u8, u16) {
-        let (valp, len) = f(param);
-        ResultValue::Val{valp, len}
+    pub fn project<U, F>(&mut self, param: &U, f: F)
+                         -> () where F: FnOnce(&U, *mut u8, *mut i16) -> usize {
+        unsafe {
+            *self.indp = 0;
+            let actual_size = f(param, self.valp, self.indp);
+            if *self.indp == 0 {
+                if actual_size > 0 && actual_size <= self.size {
+                    *self.lenp = actual_size as u32;
+                } else {
+                    *self.lenp = self.size as u32;
+                }
+            }
+        }
     }
 
 }
-*/
 
 pub(crate) struct ParamsProcessor<'conn, P> where P: ParamsProvider {
     conn:    &'conn Connection,
@@ -146,7 +152,7 @@ impl <'conn, P> ParamsProcessor<'conn, P> where P: ParamsProvider {
                 }
 
                 sizes.push(d.size as isize);
-                projection.push(ParamValue {valp: valp as *mut u8, indp: indp as *mut i16, lenp})
+                projection.push(ParamValue {valp: valp as *mut u8, indp: indp as *mut i16, lenp, size: d.size})
             }
         }
 

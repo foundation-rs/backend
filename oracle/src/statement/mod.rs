@@ -1,4 +1,4 @@
-mod params;
+pub mod params;
 mod results;
 mod memory;
 
@@ -21,10 +21,7 @@ use self::results::{
     ResultProcessor,
     QueryIterator
 };
-use self::params::{
-    ParamsProcessor,
-    ParamsProjection
-};
+use self::params::ParamsProcessor;
 
 pub use self::results::{
     ResultsProvider,
@@ -32,6 +29,7 @@ pub use self::results::{
     ResultValue
 };
 pub use self::params::{
+    ParamsProjection,
     ParamsProvider,
     ParamValue
 };

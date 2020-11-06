@@ -18,4 +18,17 @@ pub use types::{
     TypeDescriptorProducer
 };
 
-pub use statement::{Statement, Query, ResultsProvider, ResultSet, ParamsProvider};
+pub use statement::{
+    Statement,
+    Query,
+    ResultsProvider,
+    ResultSet,
+    ParamsProvider,
+    ParamsProjection,
+};
+
+pub use statement::params::{
+    Identifier,
+    Member,
+    ValueProjector
+};

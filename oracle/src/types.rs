@@ -149,7 +149,6 @@ impl TypeDescriptorProducer<String> for String {
     fn produce() -> TypeDescriptor {
         Self::produce_sized(128)
     }
-
     fn produce_sized(capacity: usize) -> TypeDescriptor {
         string_sqltype(capacity)
     }
