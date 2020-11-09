@@ -7,16 +7,16 @@ use oracle;
 use oracle_derive::{Params,Query};
 use oracle::ValueProjector;
 
-fn main() -> Result<(), &'static str> {
+fn main() -> Result<(), String> {
     let ref conf = config::load("config.json")?;
 
     let ref cc = conf.connection;
 
     let conn = oracle::connect(&cc.url, &cc.user, &cc.pw)
-        .map_err(|err|"Can not connect to Oracle")?;
+        .map_err(|err| format!("Can not connect to Oracle: {}", err))?;
 
     let tables = load(&conn, &conf.excludes)
-        .map_err(|err| "Can not read metainfo abaut oracle tables")?;
+        .map_err(|err| format!("Can not read metainfo about oracle tables: {}", err))?;
     for t in &tables {
         println!("t {}.{}; rows: {}", t.owner, t.table_name, t.num_rows);
     }
@@ -46,7 +46,11 @@ pub struct OraTableColumn {
 // TODO: convert String to &'a str
 // TODO: proper lifetimes
 #[derive(Params)]
-pub struct OraTableColumnParams (String, String);
+// pub struct OraTableColumnParams (String, String);
+pub struct OraTableColumnParams {
+    own: String,
+    nm: String
+}
 
 pub fn load(conn: &oracle::Connection, excludes: &Vec<String>) -> Result<Vec<OraTable>,oracle::OracleError> {
     use std::ops::Add;
@@ -56,9 +60,14 @@ pub fn load(conn: &oracle::Connection, excludes: &Vec<String>) -> Result<Vec<Ora
         "SELECT OWNER, TABLE_NAME, NUM_ROWS FROM SYS.ALL_TABLES WHERE OWNER NOT IN ( {} ) ORDER BY OWNER, TABLE_NAME",
             &quoted_excludes.join(","));
 
+    /*
     let sql_cols =
         "SELECT COLUMN_ID, OWNER, TABLE_NAME, COLUMN_NAME, DATA_TYPE, DATA_LENGTH, NULLABLE \
         FROM SYS.ALL_TAB_COLUMNS WHERE OWNER = :1 AND TABLE_NAME = :2";
+    */
+    let sql_cols =
+        "SELECT COLUMN_ID, OWNER, TABLE_NAME, COLUMN_NAME, DATA_TYPE, DATA_LENGTH, NULLABLE \
+        FROM SYS.ALL_TAB_COLUMNS WHERE OWNER = :own AND TABLE_NAME = :nm";
 
     let mut result = Vec::with_capacity(8000);
 
@@ -76,7 +85,8 @@ pub fn load(conn: &oracle::Connection, excludes: &Vec<String>) -> Result<Vec<Ora
     for v in query.fetch_iter()? {
         if let Ok(v) = v {
             {
-                let params = OraTableColumnParams (v.owner.clone(), v.table_name.clone());
+                // let params = OraTableColumnParams (v.owner.clone(), v.table_name.clone());
+                let params = OraTableColumnParams { own: v.owner.clone(), nm: v.table_name.clone() };
                 let columns = colmns_query.fetch_list(params)?;
                 for c in columns {
                     // println!("   c {} {}", c.column_name, c.data_type);

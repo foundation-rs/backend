@@ -100,7 +100,7 @@ fn generate_members(cont: &Container) -> TokenStream {
                 let name = name.to_string();
                 // use stringify!($section) is invalid,
                 // see: https://sequoia-pgp.gitlab.io/nettle-rs/quote/macro.quote.html
-                quote_spanned! { f.original.span() => oracle::Identifier::Named("#name") }
+                quote_spanned! { f.original.span() => oracle::Identifier::Named(#name) }
             },
             Member::Unnamed(_) => quote_spanned! { f.original.span() => oracle::Identifier::Unnamed }
         };
