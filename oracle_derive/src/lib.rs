@@ -12,6 +12,7 @@ use quote::quote;
 
 mod internals;
 mod query;
+mod params;
 
 /// Generate Query implementation in form of #[derive(Query)]
 /// example:
@@ -42,6 +43,68 @@ pub fn derive_query(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
     query::expand_derive_query(&input)
+        .unwrap_or_else(to_compile_errors)
+        .into()
+}
+
+/// Generate Params implementation in form of #[derive(Params)]
+/// example:
+/// #[derive(Params)]
+// pub struct OraTableColumnParams (String, String);
+//
+// impl oracle::ParamsProvider for OraTableColumnParams {
+//    fn members() -> Vec<oracle::Member> {
+//        use oracle::TypeDescriptorProducer;
+//        vec![
+//            oracle::Member::new(String::produce(), oracle::Identifier::Unnamed),
+//            oracle::Member::new(String::produce(), oracle::Identifier::Unnamed),
+//        ]
+//    }
+//
+//    fn project_values(&self, projecton: &mut oracle::ParamsProjection) -> () {
+//        unsafe {
+//            let p = projecton.get_unchecked_mut(0);
+//            &self.0.project_value(p);
+//        }
+//
+//        unsafe {
+//            let p = projecton.get_unchecked_mut(1);
+//            &self.1.project_value(p);
+//        }
+//    }
+//}
+//
+// pub struct TestingTuple2<'a> {
+//    id: i32,
+//    name: &'a str
+//}
+//
+//impl <'a> oracle::ParamsProvider for TestingTuple2<'a> {
+//    fn members() -> Vec<oracle::Member> {
+//        use oracle::TypeDescriptorProducer;
+//        vec![
+//            oracle::Member::new(i32::produce(), oracle::Identifier::Named("id")),
+//            oracle::Member::new(String::produce(), oracle::Identifier::Named("name")),
+//        ]
+//    }
+//
+//    fn project_values(&self, projecton: &mut oracle::ParamsProjection) -> () {
+//        unsafe {
+//            let p = projecton.get_unchecked_mut(0);
+//            &self.id.project_value(p);
+//        }
+//
+//        unsafe {
+//            let p = projecton.get_unchecked_mut(1);
+//            &self.name.project_value(p);
+//        }
+//    }
+//}
+#[proc_macro_derive(Params)]
+pub fn derive_params(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+
+    params::expand_derive_params(&input)
         .unwrap_or_else(to_compile_errors)
         .into()
 }

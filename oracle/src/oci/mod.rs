@@ -50,5 +50,6 @@ pub use functions::{
     stmt_fetch,
     define_by_pos,
     bind_by_pos,
-    bind_by_name
+    bind_by_name,
+    set_prefetch_size
 };

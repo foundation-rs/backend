@@ -53,6 +53,8 @@ pub struct BindedStatement<'conn, P> where P: ParamsProvider {
 pub struct Query<'conn,R> where R: ResultsProvider {
     stmt:    Statement<'conn>,
     results: ResultProcessor<'conn, R>,
+    prefetch_rows: usize,
+
     _result: std::marker::PhantomData<R>
 }
 
@@ -71,6 +73,8 @@ pub struct BindedQuery<'conn,R,P>
     stmt:    Statement<'conn>,
     results: ResultProcessor<'conn, R>,
     params:  ParamsProcessor<'conn, P>,
+    prefetch_rows: usize,
+
     _result: std::marker::PhantomData<R>,
     _params: std::marker::PhantomData<P>
 }
@@ -114,8 +118,7 @@ impl <'conn> Statement<'conn> {
 
     /// Execute generic statement
     pub fn execute(&mut self) -> OracleResult<()> {
-        oci::stmt_execute(self.conn.svchp, self.stmthp, self.conn.errhp, 0, 0)?;
-        Ok(())
+        oci::stmt_execute(self.conn.svchp, self.stmthp, self.conn.errhp, 0, 0).map(|_| ())
     }
 
 }
@@ -134,18 +137,16 @@ impl <'conn,R> Query<'conn,R> where R: ResultsProvider {
             10
         };
         let results = ResultProcessor::new(stmt.conn, stmt.stmthp, prefetch_rows)?;
-        Ok( Query { stmt, results, _result: PhantomData })
+        Ok( Query { stmt, results, prefetch_rows, _result: PhantomData })
     }
 
     #[inline]
     pub fn fetch_iter<'iter>(&'iter mut self) -> OracleResult<QueryIterator<'iter, 'conn, R>> {
-        self.stmt.execute()?;
         self.results.fetch_iter()
     }
 
     #[inline]
     pub fn fetch_list(&mut self) -> OracleResult<Vec<R>> {
-        self.stmt.execute()?;
         self.results.fetch_list()
     }
 
@@ -159,7 +160,6 @@ impl <'conn,R> QueryOne<'conn,R> where R: ResultsProvider {
 
     #[inline]
     pub fn fetch(&mut self) -> OracleResult<R> {
-        self.stmt.execute()?;
         self.results.fetch_one()
     }
 
@@ -207,20 +207,18 @@ impl <'conn,R, P> BindedQuery<'conn,R, P> where R: ResultsProvider,
         };
 
         let results = ResultProcessor::new(stmt.conn, stmt.stmthp, prefetch_rows)?;
-        Ok( BindedQuery { stmt, results, params, _result: PhantomData, _params: PhantomData } )
+        Ok( BindedQuery { stmt, results, params, prefetch_rows, _result: PhantomData, _params: PhantomData } )
     }
 
     #[inline]
-    pub fn fetch_iter<'iter>(&'iter mut self, params: &P) -> Result<QueryIterator<'iter, 'conn, R>, oci::OracleError> {
+    pub fn fetch_iter<'iter>(&'iter mut self, params: P) -> Result<QueryIterator<'iter, 'conn, R>, oci::OracleError> {
         params.project_values(&mut self.params.projection);
-        self.stmt.execute()?;
         self.results.fetch_iter()
     }
 
     #[inline]
-    pub fn fetch_list(&mut self, params: &P) -> Result<Vec<R>, oci::OracleError> {
+    pub fn fetch_list(&mut self, params: P) -> Result<Vec<R>, oci::OracleError> {
         params.project_values(&mut self.params.projection);
-        self.stmt.execute()?;
         self.results.fetch_list()
     }
 
@@ -230,15 +228,14 @@ impl <'conn,R, P> BindedQueryOne<'conn,R, P> where R: ResultsProvider,
                                                    P: ParamsProvider {
     fn new(binded_stmt: BindedStatement<'conn,P>) -> OracleResult<BindedQueryOne<'conn,R, P>> {
         let stmt = binded_stmt.stmt;
-        let results = ResultProcessor::new(stmt.conn, stmt.stmthp, 1)?;
         let params = binded_stmt.params;
+        let results = ResultProcessor::new(stmt.conn, stmt.stmthp, 1)?;
         Ok( BindedQueryOne { stmt, results, params, _result: PhantomData, _params: PhantomData })
     }
 
     #[inline]
     pub fn fetch(&mut self, params: P) -> OracleResult<R> {
         params.project_values(&mut self.params.projection);
-        self.stmt.execute()?;
         self.results.fetch_one()
     }
 

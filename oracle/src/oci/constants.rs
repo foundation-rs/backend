@@ -49,6 +49,7 @@ pub const OCI_ATTR_SESSION: u32 = 7;
 pub const OCI_ATTR_TRANS: u32 = 8;
 pub const OCI_ATTR_USERNAME: u32 = 22;
 pub const OCI_ATTR_PASSWORD: u32 = 23;
+pub const OCI_ATTR_PREFETCH_ROWS: u32 = 11;   /* sets the number of rows to prefetch */
 pub const OCI_ATTR_ROWS_FETCHED: u32 = 197;
 
 // transactions

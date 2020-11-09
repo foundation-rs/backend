@@ -4,7 +4,7 @@ mod config;
 // SEE: https://github.com/tafia/quick-xml
 
 use oracle;
-use oracle_derive::Query;
+use oracle_derive::{Params,Query};
 use oracle::ValueProjector;
 
 fn main() -> Result<(), &'static str> {
@@ -45,6 +45,7 @@ pub struct OraTableColumn {
 
 // TODO: convert String to &'a str
 // TODO: proper lifetimes
+#[derive(Params)]
 pub struct OraTableColumnParams (String, String);
 
 pub fn load(conn: &oracle::Connection, excludes: &Vec<String>) -> Result<Vec<OraTable>,oracle::OracleError> {
@@ -76,7 +77,7 @@ pub fn load(conn: &oracle::Connection, excludes: &Vec<String>) -> Result<Vec<Ora
         if let Ok(v) = v {
             {
                 let params = OraTableColumnParams (v.owner.clone(), v.table_name.clone());
-                let columns = colmns_query.fetch_list(&params)?;
+                let columns = colmns_query.fetch_list(params)?;
                 for c in columns {
                     // println!("   c {} {}", c.column_name, c.data_type);
                     columns_cnt +=1;
@@ -118,29 +119,6 @@ impl oracle::ParamsProvider for TestingTuple {
         unsafe {
             let p = projecton.get_unchecked_mut(2);
             &self.2.project_value(p);
-        }
-    }
-
-}
-
-impl oracle::ParamsProvider for OraTableColumnParams {
-    fn members() -> Vec<oracle::Member> {
-        use oracle::TypeDescriptorProducer;
-        vec![
-            oracle::Member::new(String::produce(), oracle::Identifier::Unnamed),
-            oracle::Member::new(String::produce(), oracle::Identifier::Unnamed),
-        ]
-    }
-
-    fn project_values(&self, projecton: &mut oracle::ParamsProjection) -> () {
-        unsafe {
-            let p = projecton.get_unchecked_mut(0);
-            &self.0.project_value(p);
-        }
-
-        unsafe {
-            let p = projecton.get_unchecked_mut(1);
-            &self.1.project_value(p);
         }
     }
 

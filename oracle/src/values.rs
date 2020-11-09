@@ -101,7 +101,7 @@ impl ValueProjector<&str> for &str {
 impl From<&ResultValue> for bool {
     fn from(v: &ResultValue) -> bool {
         let int_val = v.map_or(0,|valp,_| unsafe { transmute::<*const u8, &u16>(valp) }.to_owned());
-        if int_val < 1 { false } else { true }
+        int_val == 0
     }
 }
 

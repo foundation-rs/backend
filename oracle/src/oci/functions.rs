@@ -7,6 +7,7 @@ use super::error::{
     check_error,
     OracleError
 };
+use crate::OracleResult;
 
 /// creates and initializes an environment for the rest of the OCI functions
 #[inline]
@@ -191,13 +192,27 @@ pub fn stmt_release(stmthp: *mut OCIStmt, errhp: *mut OCIError) {
         }, Some(errhp), "oci::stmt_release").unwrap();
 }
 
+/// set prefetch_size attribute to statement
+#[inline]
+pub fn set_prefetch_size(stmthp: *mut OCIStmt, errhp: *mut OCIError, prefetch_size: u32) -> Result<(), OracleError> {
+    use std::mem::size_of;
+    let prefetch_size_ptr = &prefetch_size as *const u32;
+    attr_set(stmthp as *mut c_void, OCI_HTYPE_STMT,
+             prefetch_size_ptr as *mut c_void, size_of::<u32>() as u32,
+             OCI_ATTR_PREFETCH_ROWS, errhp)
+}
+
 /// associates an application request with a serve
 #[inline]
-pub fn stmt_execute(svchp: *mut OCISvcCtx, stmthp: *mut OCIStmt, errhp: *mut OCIError, iters: u32, rowoff: u32) -> Result<(), OracleError> {
-    check_error(
-        unsafe {
-            OCIStmtExecute(svchp, stmthp, errhp, iters, rowoff, ptr::null(), ptr::null_mut(), OCI_DEFAULT)
-        }, Some(errhp), "oci::stmt_execute")
+pub fn stmt_execute(svchp: *mut OCISvcCtx, stmthp: *mut OCIStmt, errhp: *mut OCIError, iters: u32, rowoff: u32) -> OracleResult<bool> {
+    let error_code = unsafe {
+        OCIStmtExecute(svchp, stmthp, errhp, iters, rowoff, ptr::null(), ptr::null_mut(), OCI_DEFAULT)
+    };
+    if error_code != OCI_SUCCESS && error_code != OCI_NO_DATA {
+        check_error(error_code, Some(errhp), "oci::stmt_execute").map(|_| false)
+    } else {
+        Ok(error_code == OCI_SUCCESS)
+    }
 }
 
 /// defines an output buffer which will receive data retreived from Oracle
