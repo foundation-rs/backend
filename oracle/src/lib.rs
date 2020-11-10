@@ -1,3 +1,5 @@
+#![feature(min_const_generics)]
+
 mod environment;
 mod oci;
 mod connection;
@@ -21,10 +23,6 @@ pub use types::{
 pub use statement::{
     Statement,
     Query,
-    BindedStatement,
-    BindedQuery,
-    QueryOne,
-    BindedQueryOne,
     ResultsProvider,
     ResultSet,
     ParamsProvider,

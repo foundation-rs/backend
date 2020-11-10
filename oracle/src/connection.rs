@@ -75,33 +75,31 @@ impl Connection {
 
     /// Execute generic SQL statement
     pub fn execute<'conn,'s>(&'conn self, sql: &'s str) -> Result<(), oci::OracleError> {
-        let mut st = statement::Statement::new(self, sql)?;
-        st.execute()
+        let st = statement::Statement::new(self, sql)?;
+        st.execute(&())
     }
 
     /// Prepare generic oracle statement
-    pub fn prepare<'conn,'s>(&'conn self, sql: &'s str) -> Result<statement::Statement<'conn>, oci::OracleError> {
+    pub fn prepare<P>(&self, sql: &str)
+                   -> Result<statement::Statement<P>, oci::OracleError>
+        where P: ParamsProvider {
         statement::Statement::new(self, sql)
     }
 
     /// Prepare query with default 10 prefetch rows
-    pub fn query<R>(&self, sql: &str)
-                    -> OracleResult<statement::Query<R>> where R: ResultsProvider {
+    pub fn query<P,R>(&self, sql: &str)
+                    -> OracleResult<statement::Query<P,R,10>>
+        where P: ParamsProvider, R: ResultsProvider {
         statement::Statement::new(self, sql)?.query()
     }
 
-    /// Prepare query with 10 row
-    pub fn query_one<R>(&self, sql: &str)
-                    -> OracleResult<statement::QueryOne<R>> where R: ResultsProvider {
+    /// Prepare query with 1 row
+    pub fn query_one<P,R>(&self, sql: &str)
+                    -> OracleResult<statement::Query<P,R,1>>
+        where P: ParamsProvider, R: ResultsProvider {
         statement::Statement::new(self, sql)?.query_one()
     }
 
-    /// Prepare query with default 10 prefetch rows and params
-    pub fn query_with_params<R,P>(&self, sql: &str)
-                    -> OracleResult<statement::BindedQuery<R,P>>
-        where R: ResultsProvider, P: ParamsProvider {
-        statement::Statement::new(self, sql)?.params()?.query()
-    }
 }
 
 impl Drop for Connection {

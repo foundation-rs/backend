@@ -59,12 +59,20 @@ impl <T> ParamsProvider for T
         ]
     }
 
-    fn project_values(&self, projecton: &mut ParamsProjection) -> () {
+    fn project_values(&self, projecton: &mut ParamsProjection) {
         unsafe {
             let p = projecton.get_unchecked_mut(0);
             &self.project_value(p);
         }
     }
+}
+
+// implement params provider for singular type
+impl ParamsProvider for () {
+    fn members() -> Vec<Member> {
+        vec![]
+    }
+    fn project_values(&self, projecton: &mut ParamsProjection) {}
 }
 
 // implement params provider for pair tuple
@@ -78,7 +86,7 @@ impl <T,V> ParamsProvider for (T,V)
         ]
     }
 
-    fn project_values(&self, projecton: &mut ParamsProjection) -> () {
+    fn project_values(&self, projecton: &mut ParamsProjection) {
         unsafe {
             let p = projecton.get_unchecked_mut(0);
             &self.0.project_value(p);
