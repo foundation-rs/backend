@@ -1,17 +1,10 @@
 use proc_macro2::{Literal, Span, TokenStream};
-use syn::{
-    self,
-    Data,
-    Field,
-    Ident,
-    Index,
-    Member,
-    spanned::Spanned
-};
+use syn::{self, Data, Field, Ident, Index, Member, spanned::Spanned, Type, TypePath};
 use quote::{quote, quote_spanned};
 
 use crate::internals::Ctxt;
 use crate::internals::ast::Container;
+use std::convert::TryFrom;
 
 /// Expands #[derive(Params)] macro.
 pub fn expand_derive_params(input: &syn::DeriveInput) -> Result<TokenStream, Vec<syn::Error>> {
@@ -35,7 +28,7 @@ pub fn expand_derive_params(input: &syn::DeriveInput) -> Result<TokenStream, Vec
     Ok(quote! {
         impl #impl_generics oracle::ParamsProvider for #name #ty_generics #where_clause {
             #[doc = #doc_comment]
-            fn project_values(&self, projecton: &mut oracle::ParamsProjection) -> () {
+            fn project_values(&self, projecton: &mut oracle::ParamsProjection) {
                 #project_values_body
             }
 
@@ -94,7 +87,29 @@ fn generate_project_values(cont: &Container) -> TokenStream {
 //     ]
 fn generate_members(cont: &Container) -> TokenStream {
     let expressions = cont.data.all_fields().map(|f| {
-        let ty = f.ty;
+        let mut ty = f.ty;
+
+        let convert_to_string =
+            if let syn::Type::Reference(x) = ty {
+                let ref_type = &x.elem;
+                let path = extract_path(ref_type).expect("Can not parse type of field");
+                let segment = path.path.segments.first().expect("Can not parse type of field");
+
+                if segment.ident == "str" {
+                    true
+                } else {
+                    false
+                }
+            } else {
+                false
+            };
+
+        let producer = if convert_to_string {
+            quote_spanned! { ty.span() => String::produce() }
+        } else {
+            quote_spanned! { ty.span() => #ty::produce() }
+        };
+
         let ident = match &f.member {
             Member::Named(name) => {
                 let name = name.to_string();
@@ -104,10 +119,28 @@ fn generate_members(cont: &Container) -> TokenStream {
             },
             Member::Unnamed(_) => quote_spanned! { f.original.span() => oracle::Identifier::Unnamed }
         };
-        quote_spanned! { f.original.span() => oracle::Member::new(#ty::produce(), #ident) }
+
+        quote_spanned! { f.original.span() => oracle::Member::new(#producer, #ident) }
     });
     quote! {
         use oracle::TypeDescriptorProducer;
         vec![ #(#expressions),* ]
     }
 }
+
+fn extract_path(ty: &syn::Type) -> Option<&syn::TypePath> {
+    if let syn::Type::Path(x) = ty {
+        Some(x)
+    } else {
+        None
+    }
+}
+
+fn extract_reference(ty: &syn::Type) -> Option<&syn::TypeReference> {
+    if let syn::Type::Reference(x) = ty {
+        Some(x)
+    } else {
+        None
+    }
+}
+

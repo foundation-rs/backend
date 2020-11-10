@@ -45,11 +45,11 @@ pub struct OraTableColumn {
 
 // TODO: convert String to &'a str
 // TODO: proper lifetimes
-#[derive(Params)]
 // pub struct OraTableColumnParams (String, String);
-pub struct OraTableColumnParams {
-    own: String,
-    nm: String
+#[derive(Params)]
+pub struct OraTableColumnParams<'a> {
+    own: &'a str,
+    nm: &'a str,
 }
 
 pub fn load(conn: &oracle::Connection, excludes: &Vec<String>) -> Result<Vec<OraTable>,oracle::OracleError> {
@@ -77,21 +77,19 @@ pub fn load(conn: &oracle::Connection, excludes: &Vec<String>) -> Result<Vec<Ora
 
     let mut colmns_query = conn
         .prepare(&sql_cols)?
-        .params::<OraTableColumnParams>()?
+        // .params::<OraTableColumnParams>()?
+        .params::<(&str,&str)>()?
         .query_many::<OraTableColumn>(100)?;
 
     let mut columns_cnt = 0;
 
     for v in query.fetch_iter()? {
         if let Ok(v) = v {
-            {
-                // let params = OraTableColumnParams (v.owner.clone(), v.table_name.clone());
-                let params = OraTableColumnParams { own: v.owner.clone(), nm: v.table_name.clone() };
-                let columns = colmns_query.fetch_list(params)?;
-                for c in columns {
-                    // println!("   c {} {}", c.column_name, c.data_type);
-                    columns_cnt +=1;
-                }
+            // let params = OraTableColumnParams { own: &v.owner, nm: &v.table_name };
+            let columns = colmns_query.fetch_list(&(&v.owner, &v.table_name))?;
+            for c in columns {
+                // println!("   c {} {}", c.column_name, c.data_type);
+                columns_cnt +=1;
             }
             result.push(v);
         };

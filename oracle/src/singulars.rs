@@ -32,25 +32,6 @@ macro_rules! impl_results_provider {
     }
 }
 
-macro_rules! impl_params_provider {
-    ($T:ty, $name:ident) => {
-
-        impl ParamsProvider for $T {
-            fn members() -> Vec<Member> {
-                vec![Member::new($name, Identifier::Unnamed)]
-            }
-
-            fn project_values(&self, projecton: &mut ParamsProjection) -> () {
-                unsafe {
-                    let p = projecton.get_unchecked_mut(0);
-                    &self.project_value(p);
-                }
-            }
-        }
-
-    }
-}
-
 impl_results_provider!(u32, U32_SQLTYPE);
 impl_results_provider!(i32, I32_SQLTYPE);
 impl_results_provider!(bool, BOOL_SQLTYPE);
@@ -58,13 +39,6 @@ impl_results_provider!(bool, BOOL_SQLTYPE);
 impl_results_provider!(SqlDate, DATE_SQLTYPE);
 impl_results_provider!(SqlDateTime, TIMESTAMP_SQLTYPE);
 
-impl_params_provider!(u32, U32_SQLTYPE);
-impl_params_provider!(i32, I32_SQLTYPE);
-impl_params_provider!(bool, BOOL_SQLTYPE);
-
-/* TODO: implement project_value for dates
-impl_params_provider!(SqlDate, DATE_SQLTYPE);
- */
 
 impl ResultsProvider for String {
     fn from_resultset(rs: &ResultSet) -> Self {
@@ -76,9 +50,13 @@ impl ResultsProvider for String {
     }
 }
 
-impl ParamsProvider for String {
+// implement params provider for singular type
+impl <T> ParamsProvider for T
+    where T: TypeDescriptorProducer<T> + ValueProjector<T> {
     fn members() -> Vec<Member> {
-        vec![Member::new(String::produce(), Identifier::Unnamed)]
+        vec![
+            Member::new(T::produce(), Identifier::Unnamed),
+        ]
     }
 
     fn project_values(&self, projecton: &mut ParamsProjection) -> () {
@@ -89,3 +67,25 @@ impl ParamsProvider for String {
     }
 }
 
+// implement params provider for pair tuple
+impl <T,V> ParamsProvider for (T,V)
+    where T: TypeDescriptorProducer<T> + ValueProjector<T>,
+          V: TypeDescriptorProducer<V> + ValueProjector<V> {
+    fn members() -> Vec<Member> {
+        vec![
+            Member::new(T::produce(), Identifier::Unnamed),
+            Member::new(V::produce(), Identifier::Unnamed)
+        ]
+    }
+
+    fn project_values(&self, projecton: &mut ParamsProjection) -> () {
+        unsafe {
+            let p = projecton.get_unchecked_mut(0);
+            &self.0.project_value(p);
+        }
+        unsafe {
+            let p = projecton.get_unchecked_mut(1);
+            &self.1.project_value(p);
+        }
+    }
+}

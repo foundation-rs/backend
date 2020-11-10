@@ -74,7 +74,7 @@ pub(crate) struct ResultProcessor<'conn, R> where R: ResultsProvider {
 }
 
 pub struct QueryIterator<'iter,'conn: 'iter, R> where R: ResultsProvider {
-    processor: &'iter mut ResultProcessor<'conn, R>,
+    processor: &'iter ResultProcessor<'conn, R>,
     done:      bool,
     initial_prefetched: u32,
     rows_fetched: u32,
@@ -133,11 +133,11 @@ impl <'conn, R> ResultProcessor<'conn, R> where R: ResultsProvider {
     }
 
     /// Execute generic statement with prefetch values
-    fn execute_prefetch(&mut self, iters: u32) -> OracleResult<bool> {
+    fn execute_prefetch(&self, iters: u32) -> OracleResult<bool> {
         oci::stmt_execute(self.conn.svchp, self.stmthp, self.conn.errhp, iters, 0)
     }
 
-    pub(crate) fn fetch_iter<'iter>(&'iter mut self) ->
+    pub(crate) fn fetch_iter<'iter>(&'iter self) ->
     Result<QueryIterator<'iter, 'conn, R>, oci::OracleError> {
         let success = self.execute_prefetch(self.prefetch_rows as u32)?;
         let prefetched = self.initial_fetch(success)?;
@@ -145,7 +145,7 @@ impl <'conn, R> ResultProcessor<'conn, R> where R: ResultsProvider {
         Ok(QueryIterator::new(self, prefetched))
     }
 
-    pub(crate) fn fetch_list (&mut self)
+    pub(crate) fn fetch_list (&self)
                                   -> Result<Vec<R>, oci::OracleError> {
         let mut result = Vec::with_capacity(self.prefetch_rows);
 
@@ -158,7 +158,7 @@ impl <'conn, R> ResultProcessor<'conn, R> where R: ResultsProvider {
         Ok( result )
     }
 
-    pub(crate) fn fetch_one(&mut self) -> Result<R, oci::OracleError> {
+    pub(crate) fn fetch_one(&self) -> Result<R, oci::OracleError> {
         let mut iter = self.fetch_iter()?;
         match iter.next() {
             Some(v) => v,
@@ -166,7 +166,7 @@ impl <'conn, R> ResultProcessor<'conn, R> where R: ResultsProvider {
         }
     }
 
-    fn get_result(&mut self, index: isize) -> ResultSet {
+    fn get_result(&self, index: isize) -> ResultSet {
         let mut result = Vec::with_capacity(self.sizes.len());
 
         let mut v_offset: isize = 0;
@@ -197,7 +197,7 @@ impl <'conn, R> ResultProcessor<'conn, R> where R: ResultsProvider {
         result
     }
 
-    fn get_last_fetched_rows(&mut self) -> OracleResult<u32> {
+    fn get_last_fetched_rows(&self) -> OracleResult<u32> {
         let mut rows_fetched: u32 = 0;
         let rows_fetcher_ptr: *mut u32 = &mut rows_fetched;
 
@@ -205,7 +205,7 @@ impl <'conn, R> ResultProcessor<'conn, R> where R: ResultsProvider {
         Ok(rows_fetched)
     }
 
-    fn initial_fetch(&mut self, success: bool) -> OracleResult<u32> {
+    fn initial_fetch(&self, success: bool) -> OracleResult<u32> {
         if success {
             Ok(self.prefetch_rows as u32)
         } else {
@@ -214,7 +214,7 @@ impl <'conn, R> ResultProcessor<'conn, R> where R: ResultsProvider {
         }
     }
 
-    fn fetch(&mut self) -> Result<(u32, bool), oci::OracleError> {
+    fn fetch(&self) -> Result<(u32, bool), oci::OracleError> {
         let mut done = false;
 
         if let Err(error) = oci::stmt_fetch(self.stmthp, self.conn.errhp, self.prefetch_rows as u32, oci::OCI_FETCH_NEXT, 0) {
@@ -241,7 +241,7 @@ impl <R> Drop for ResultProcessor<'_,R> where R: ResultsProvider {
 }
 
 impl <'iter,'conn: 'iter, R> QueryIterator<'iter,'conn, R> where R: ResultsProvider {
-    fn new(processor: &'iter mut ResultProcessor<'conn, R>, initial_prefetched: u32) -> QueryIterator<'iter,'conn, R> {
+    fn new(processor: &'iter ResultProcessor<'conn, R>, initial_prefetched: u32) -> QueryIterator<'iter,'conn, R> {
         QueryIterator { processor, done: false, initial_prefetched, rows_fetched: 0, cursor_index: 0, _result: PhantomData }
     }
 }

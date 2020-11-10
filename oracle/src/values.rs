@@ -158,4 +158,25 @@ impl From<&ResultValue> for SqlDateTime {
     }
 }
 
+impl ValueProjector<SqlDate> for SqlDate {
+    fn project_value(&self, projection: &mut ParamValue) {
+        projection.project(self, |val, data, _| {
+            let century = (self.year() / 100 + 100) as u8;
+            let year = (self.year() % 100 + 100) as u8;
+            let month = self.month() as u8;
+            let day = self.day() as u8;
+            unsafe {
+                *data = century;
+                *data.offset(1) = year;
+                *data.offset(2) = month;
+                *data.offset(3) = day;
+                *data.offset(4) = 1;  // hour
+                *data.offset(5) = 1;  // minute
+                *data.offset(6) = 1;  // second
+                0
+            }
+        });
+    }
+}
+
 // TODO: optional converters for date and datetime

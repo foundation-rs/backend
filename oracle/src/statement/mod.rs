@@ -34,7 +34,7 @@ pub use self::params::{
     ParamValue
 };
 
-use crate::OracleResult;
+use crate::{OracleResult, OracleError};
 
 /// Generic prepared statement
 pub struct Statement<'conn> {
@@ -112,7 +112,7 @@ impl <'conn> Statement<'conn> {
     }
 
     /// Bind parameters descriptions to statement
-    pub fn params<P: ParamsProvider>(mut self) -> OracleResult<BindedStatement<'conn,P>> {
+    pub fn params<P: ParamsProvider>(self) -> OracleResult<BindedStatement<'conn,P>> {
         BindedStatement::new(self)
     }
 
@@ -188,7 +188,8 @@ impl <'conn,P> BindedStatement<'conn,P> where P: ParamsProvider {
 
     /// Execute generic statement with params
     pub fn execute(&mut self, params: P) -> Result<(),oci::OracleError> {
-        params.project_values(&mut self.params.projection);
+        let projection = self.params.projection.get_mut();
+        params.project_values(projection);
         self.stmt.execute()
     }
 
@@ -211,14 +212,22 @@ impl <'conn,R, P> BindedQuery<'conn,R, P> where R: ResultsProvider,
     }
 
     #[inline]
-    pub fn fetch_iter<'iter>(&'iter mut self, params: P) -> Result<QueryIterator<'iter, 'conn, R>, oci::OracleError> {
-        params.project_values(&mut self.params.projection);
+    pub fn fetch_iter<'iter,'p>(&'conn self, params: &'p P) ->
+                                                                Result<QueryIterator<'iter, 'conn, R>, oci::OracleError> where 'conn: 'iter, 'iter: 'p {
+        let mut projection = self.params.projection
+            .try_borrow_mut()
+            .map_err(|err|OracleError::new(format!("Can not borrow params-projection for set-params: {}", err),"BindedQuery::fetch_iter"))?;
+        params.project_values(projection.as_mut());
         self.results.fetch_iter()
     }
 
     #[inline]
-    pub fn fetch_list(&mut self, params: P) -> Result<Vec<R>, oci::OracleError> {
-        params.project_values(&mut self.params.projection);
+    pub fn fetch_list<'p>(&self, params: &'p P) -> Result<Vec<R>, oci::OracleError> {
+        let mut projection = self.params.projection
+            .try_borrow_mut()
+            .map_err(|err|OracleError::new(format!("Can not borrow params-projection for set-params: {}", err),"BindedQuery::fetch_list"))?;
+
+        params.project_values(projection.as_mut());
         self.results.fetch_list()
     }
 
@@ -235,7 +244,11 @@ impl <'conn,R, P> BindedQueryOne<'conn,R, P> where R: ResultsProvider,
 
     #[inline]
     pub fn fetch(&mut self, params: P) -> OracleResult<R> {
-        params.project_values(&mut self.params.projection);
+        let mut projection = self.params.projection
+            .try_borrow_mut()
+            .map_err(|err|OracleError::new(format!("Can not borrow params-projection for set-params: {}", err),"BindedQueryOne::fetch"))?;
+
+        params.project_values(projection.as_mut());
         self.results.fetch_one()
     }
 

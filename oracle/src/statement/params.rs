@@ -11,6 +11,7 @@ use crate::oci;
 use crate::connection::Connection;
 use crate::types::TypeDescriptor;
 use crate::statement::memory::align_size_to;
+use std::cell::RefCell;
 
 pub struct ParamValue {
     valp: *mut u8,
@@ -98,7 +99,7 @@ pub(crate) struct ParamsProcessor<'conn, P> where P: ParamsProvider {
     indicators_p:     *const i16, // pointer to indicators area
     actual_lengths_p: *const u32,  // pointer to actual length area
 
-    pub(crate) projection: ParamsProjection,
+    pub(crate) projection: RefCell<ParamsProjection>,
 
     _params: std::marker::PhantomData<P>
 }
@@ -155,6 +156,8 @@ impl <'conn, P> ParamsProcessor<'conn, P> where P: ParamsProvider {
                 projection.push(ParamValue {valp: valp as *mut u8, indp: indp as *mut i16, lenp, size: d.size})
             }
         }
+
+        let projection = RefCell::new(projection);
 
         Ok(ParamsProcessor {conn, stmthp, sizes, allocated_p, allocated_layout, values_p, indicators_p, actual_lengths_p, projection, _params: PhantomData})
     }

@@ -16,9 +16,9 @@ pub struct Config {
 }
 
 pub fn load(filename: &str) -> Result<Config, &'static str> {
-    let mut file = File::open(filename).map_err(|err| "Can not open config file")?;
+    let mut file = File::open(filename).map_err(|_err| "Can not open config file")?;
     let mut data = String::new();
-    file.read_to_string(&mut data).map_err(|err| "Can not read config file")?;
+    file.read_to_string(&mut data).map_err(|_err| "Can not read config file")?;
 
-    serde_json::from_str(&data).map_err(|err| "Can not parse config file")
+    serde_json::from_str(&data).map_err(|_err| "Can not parse config file")
 }

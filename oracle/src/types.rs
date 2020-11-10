@@ -154,6 +154,15 @@ impl TypeDescriptorProducer<String> for String {
     }
 }
 
+impl TypeDescriptorProducer<&str> for &str {
+    fn produce() -> TypeDescriptor {
+        Self::produce_sized(128)
+    }
+    fn produce_sized(capacity: usize) -> TypeDescriptor {
+        string_sqltype(capacity)
+    }
+}
+
 // all about dates
 
 // TODO: inconsistency between timestamp and datetime
