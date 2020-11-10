@@ -76,7 +76,7 @@ impl Connection {
     /// Execute generic SQL statement
     pub fn execute<'conn,'s>(&'conn self, sql: &'s str) -> Result<(), oci::OracleError> {
         let st = statement::Statement::new(self, sql)?;
-        st.execute(&())
+        st.execute(())
     }
 
     /// Prepare generic oracle statement

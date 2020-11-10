@@ -1,6 +1,5 @@
 use std::alloc::{alloc, dealloc, Layout};
 use std::marker::PhantomData;
-use std::ptr::{null, null_mut};
 use libc;
 
 #[allow(dead_code)]
@@ -9,12 +8,9 @@ use libc;
 use crate::oci;
 
 use crate::connection::Connection;
-use crate::types::{
-    DescriptorsProvider,
-    TypeDescriptor
-};
+use crate::types::TypeDescriptor;
 use crate::statement::memory::align_size_to;
-use crate::{OracleError, OracleResult};
+use crate::OracleResult;
 
 /// Contains row data for one item.
 /// Used for result-set
@@ -264,7 +260,7 @@ impl <'iter, 'conn: 'iter, R> Iterator for QueryIterator<'iter,'conn, R> where R
                     return None;
                 } else {
                     self.rows_fetched = self.initial_prefetched;
-                    if (self.rows_fetched < self.processor.prefetch_rows as u32) {
+                    if self.rows_fetched < self.processor.prefetch_rows as u32 {
                         self.done = true;
                     }
                 }

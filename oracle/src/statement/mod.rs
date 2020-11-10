@@ -1,5 +1,3 @@
-#![feature(min_const_generics)]
-
 pub mod params;
 mod results;
 mod memory;
@@ -69,17 +67,17 @@ impl <'conn,P> Statement<'conn,P> where P: ParamsProvider {
 
     /// Prepare oracle statement with custom prefetch rows
     pub fn query_many<R: ResultsProvider, const PREFETCH: usize>(self) -> OracleResult<Query<'conn,P,R,PREFETCH>> {
-        assert!(PREFETCH > 10 && PREFETCH <= 10000);
+        assert!(PREFETCH == 20 || PREFETCH == 50 || PREFETCH == 100 || PREFETCH == 200 || PREFETCH == 500 || PREFETCH == 1000 || PREFETCH == 5000 || PREFETCH == 10000);
         Query::new(self)
     }
 
     /// Execute generic statement with params
-    pub fn execute(&self, params: &P) -> OracleResult<()> {
+    pub fn execute(&self, params: P) -> OracleResult<()> {
         self.set_params(params)?;
         oci::stmt_execute(self.conn.svchp, self.stmthp, self.conn.errhp, 0, 0).map(|_| ())
     }
 
-    pub(crate) fn set_params(&self, params: &P) -> OracleResult<()> {
+    pub(crate) fn set_params(&self, params: P) -> OracleResult<()> {
         let mut projection = self.params.projection
             .try_borrow_mut()
             .map_err(|err|OracleError::new(format!("Can not borrow params-projection for set-params: {}", err),"Statement::set_params"))?;
@@ -102,21 +100,21 @@ impl <'conn,P,R,const PREFETCH: usize> Query<'conn,P,R,PREFETCH> where P: Params
     }
 
     #[inline]
-    pub fn fetch_iter<'iter,'p>(&'iter self, params: &'p P) -> OracleResult<QueryIterator<'iter, 'conn, R>> {
+    pub fn fetch_iter<'iter>(&'iter self, params: P) -> OracleResult<QueryIterator<'iter, 'conn, R>> {
         assert!(PREFETCH > 1);
         self.stmt.set_params(params)?;
         self.results.fetch_iter()
     }
 
     #[inline]
-    pub fn fetch_list(&self, params: &P) -> OracleResult<Vec<R>> {
+    pub fn fetch_list(&self, params: P) -> OracleResult<Vec<R>> {
         assert!(PREFETCH > 1);
         self.stmt.set_params(params)?;
         self.results.fetch_list()
     }
 
     #[inline]
-    pub fn fetch(&self, params: &P) -> OracleResult<R> {
+    pub fn fetch(&self, params: P) -> OracleResult<R> {
         assert_eq!(PREFETCH, 1);
         self.stmt.set_params(params)?;
         self.results.fetch_one()

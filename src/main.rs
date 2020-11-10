@@ -59,8 +59,6 @@ pub struct OraTableColumnParams<'a> {
 }
 
 pub fn load(conn: &oracle::Connection, excludes: &Vec<String>) -> Result<Vec<OraTable>,oracle::OracleError> {
-    use std::ops::Add;
-
     let quoted_excludes: Vec<String> = excludes.iter().map(|s| format!("'{}'", s) ).collect();
     let sql = format!(
         "SELECT OWNER, TABLE_NAME, NUM_ROWS FROM SYS.ALL_TABLES WHERE OWNER NOT IN ( {} ) ORDER BY OWNER, TABLE_NAME",
@@ -87,10 +85,10 @@ pub fn load(conn: &oracle::Connection, excludes: &Vec<String>) -> Result<Vec<Ora
 
     let mut columns_cnt = 0;
 
-    for v in query.fetch_iter(&())? {
+    for v in query.fetch_iter(())? {
         if let Ok(v) = v {
             // let params = OraTableColumnParams { own: &v.owner, nm: &v.table_name };
-            let columns = colmns_query.fetch_list(&(v.owner.as_ref(), v.table_name.as_ref()))?;
+            let columns = colmns_query.fetch_list((v.owner.as_ref(), v.table_name.as_ref()))?;
             for c in columns {
                 // println!("   c {} {}", c.column_name, c.data_type);
                 columns_cnt +=1;
