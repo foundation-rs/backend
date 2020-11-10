@@ -16,7 +16,7 @@ pub struct Connection {
 }
 
 /// connect to database
-pub fn connect(db: &str, username: &str, passwd: &str) -> Result<Connection, oci::OracleError> {
+pub fn connect(db: &str, username: &str, passwd: &str) -> OracleResult<Connection> {
     let env = Environment::get()?;
     let srvhp = oci::handle_alloc(env.envhp, oci::OCI_HTYPE_SERVER)? as *mut oci::OCIServer;
     let svchp = oci::handle_alloc(env.envhp, oci::OCI_HTYPE_SVCCTX)? as *mut oci::OCISvcCtx;
@@ -64,24 +64,24 @@ impl Connection {
     }
 
     /// commit transaction with NO-WAIT option
-    pub fn commit(&self) -> Result<(), oci::OracleError> {
+    pub fn commit(&self) -> OracleResult<()> {
         oci::commit(self.svchp, self.env.errhp)
     }
 
     /// rollback transation
-    pub fn rollback(&self) -> Result<(), oci::OracleError> {
+    pub fn rollback(&self) -> OracleResult<()> {
         oci::rollback(self.svchp, self.env.errhp)
     }
 
     /// Execute generic SQL statement
-    pub fn execute<'conn,'s>(&'conn self, sql: &'s str) -> Result<(), oci::OracleError> {
+    pub fn execute<'conn,'s>(&'conn self, sql: &'s str) -> OracleResult<()> {
         let st = statement::Statement::new(self, sql)?;
         st.execute(())
     }
 
     /// Prepare generic oracle statement
     pub fn prepare<P>(&self, sql: &str)
-                   -> Result<statement::Statement<P>, oci::OracleError>
+                   -> OracleResult<statement::Statement<P>>
         where P: ParamsProvider {
         statement::Statement::new(self, sql)
     }

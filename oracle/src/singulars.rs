@@ -1,5 +1,5 @@
 // TODO: inconsistency between timestamp and datetime
-use crate::dates::*;
+use crate::sql_types::*;
 use crate::{
     ParamsProjection,
     ParamsProvider,
@@ -72,7 +72,7 @@ impl ParamsProvider for () {
     fn members() -> Vec<Member> {
         vec![]
     }
-    fn project_values(&self, projecton: &mut ParamsProjection) {}
+    fn project_values(&self, _projecton: &mut ParamsProjection) {}
 }
 
 // implement params provider for pair tuple

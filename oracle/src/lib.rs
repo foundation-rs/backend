@@ -5,14 +5,14 @@ mod oci;
 mod connection;
 mod types;
 mod values;
-mod dates;
+mod sql_types;
 mod statement;
 mod singulars;
 
 pub use oci::{OracleError, OracleResult};
 pub use connection::{Connection, connect};
 
-pub use dates::{SqlDate, SqlDateTime};
+pub use sql_types::{SqlDate, SqlDateTime};
 
 pub use types::{
     DescriptorsProvider,

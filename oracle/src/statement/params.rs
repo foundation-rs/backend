@@ -1,6 +1,5 @@
 use std::alloc::{alloc, dealloc, Layout};
 use std::marker::PhantomData;
-use std::ptr::{null, null_mut};
 use libc;
 
 #[allow(dead_code)]
@@ -53,7 +52,7 @@ impl <'a> ParamValue {
     /// Convert optional type to row data
     #[inline]
     pub fn project_optional<U, F>(&mut self, param: &Option<U>, f: F)
-                                  -> () where F: FnOnce(&U, *mut u8, *mut i16) -> usize {
+                                  -> () where F: FnOnce(*mut u8, *mut i16) -> usize {
         unsafe {
             match param {
                 None => {
@@ -61,7 +60,7 @@ impl <'a> ParamValue {
                 },
                 Some(val) => {
                     *self.indp = 0;
-                    self.project(val, f);
+                    self.project(param, f);
                 }
             }
         };
@@ -70,10 +69,10 @@ impl <'a> ParamValue {
     /// Convert non-optional type to row data
     #[inline]
     pub fn project<U, F>(&mut self, param: &U, f: F)
-                         -> () where F: FnOnce(&U, *mut u8, *mut i16) -> usize {
+                         -> () where F: FnOnce(*mut u8, *mut i16) -> usize {
         unsafe {
             *self.indp = 0;
-            let actual_size = f(param, self.valp, self.indp);
+            let actual_size = f(self.valp, self.indp);
             if *self.indp == 0 {
                 if actual_size > 0 && actual_size <= self.size {
                     *self.lenp = actual_size as u32;
@@ -86,26 +85,17 @@ impl <'a> ParamValue {
 
 }
 
-pub(crate) struct ParamsProcessor<'conn, P> where P: ParamsProvider {
-    conn:    &'conn Connection,
-    stmthp:  *mut oci::OCIStmt,
-
-    sizes:            Vec<isize>,
-
+pub(crate) struct ParamsProcessor<P> where P: ParamsProvider {
     allocated_p:   *mut u8,    // pointer to a main allocated block
     allocated_layout: Layout,  // layout of allocated block
-
-    values_p:         *const u8,            // pointer to values area
-    indicators_p:     *const i16, // pointer to indicators area
-    actual_lengths_p: *const u32,  // pointer to actual length area
 
     pub(crate) projection: RefCell<ParamsProjection>,
 
     _params: std::marker::PhantomData<P>
 }
 
-impl <'conn, P> ParamsProcessor<'conn, P> where P: ParamsProvider {
-    pub(crate) fn new(conn: &'conn Connection, stmthp: *mut oci::OCIStmt) -> Result<ParamsProcessor<'conn, P>, oci::OracleError> {
+impl <P> ParamsProcessor<P> where P: ParamsProvider {
+    pub(crate) fn new(conn: &Connection, stmthp: *mut oci::OCIStmt) -> Result<ParamsProcessor<P>, oci::OracleError> {
         let members = P::members();
         let columns_cnt = members.len();
 
@@ -159,12 +149,12 @@ impl <'conn, P> ParamsProcessor<'conn, P> where P: ParamsProvider {
 
         let projection = RefCell::new(projection);
 
-        Ok(ParamsProcessor {conn, stmthp, sizes, allocated_p, allocated_layout, values_p, indicators_p, actual_lengths_p, projection, _params: PhantomData})
+        Ok(ParamsProcessor {allocated_p, allocated_layout, projection, _params: PhantomData})
     }
 
 }
 
-impl <P> Drop for ParamsProcessor<'_,P> where P: ParamsProvider {
+impl <P> Drop for ParamsProcessor<P> where P: ParamsProvider {
     fn drop(&mut self) {
         unsafe { dealloc(self.allocated_p, self.allocated_layout); };
     }

@@ -1,6 +1,5 @@
 use std::mem::transmute;
 use std::ptr;
-use libc;
 
 use crate::statement::{ParamValue, ResultValue};
 use crate::ValueProjector;
@@ -24,9 +23,9 @@ macro_rules! convert_sql_and_primitive {
 
         impl ValueProjector<$T> for $T {
             fn project_value(&self, projection: &mut ParamValue) {
-                projection.project(self, |val, data, _| {
+                projection.project(self, |data, _| {
                     unsafe {
-                        *( transmute::<*mut u8, &mut $T>(data) ) = *val;
+                        *( transmute::<*mut u8, &mut $T>(data) ) = *self;
                         0
                     }
                 });
@@ -66,13 +65,13 @@ impl From<&ResultValue> for String {
 
 impl ValueProjector<String> for String {
     fn project_value(&self, projection: &mut ParamValue) {
-        projection.project(self, |val, data, indp| {
-            let str_len = val.len();
+        projection.project(self, |data, indp| {
+            let str_len = self.len();
             unsafe {
                 if str_len == 0 {
                     *indp = -1;
                 } else {
-                    ptr::copy(val.as_ptr(), data, str_len);
+                    ptr::copy(self.as_ptr(), data, str_len);
                 }
                 str_len
             }
@@ -82,13 +81,13 @@ impl ValueProjector<String> for String {
 
 impl ValueProjector<&str> for &str {
     fn project_value(&self, projection: &mut ParamValue) {
-        projection.project(self, |val, data, indp| {
-            let str_len = val.len();
+        projection.project(self, | data, indp| {
+            let str_len = self.len();
             unsafe {
                 if str_len == 0 {
                     *indp = -1;
                 } else {
-                    ptr::copy(val.as_ptr(), data, str_len);
+                    ptr::copy(self.as_ptr(), data, str_len);
                 }
                 str_len
             }
@@ -107,7 +106,7 @@ impl From<&ResultValue> for bool {
 
 impl ValueProjector<bool> for bool {
     fn project_value(&self, projection: &mut ParamValue) {
-        projection.project(self, |val, data, _| {
+        projection.project(self, |data, _| {
             let val: u16 = if *self { 1 } else { 0 };
             unsafe {
                 *( transmute::<*mut u8, &mut u16>(data) ) = val;
@@ -119,7 +118,7 @@ impl ValueProjector<bool> for bool {
 
 // Date and Datetime
 use chrono::prelude::*;
-use crate::dates::*;
+use crate::sql_types::*;
 
 // TODO: Datetime have 7 bytes
 // TODO: Timestamp have 11 bytes
@@ -160,7 +159,7 @@ impl From<&ResultValue> for SqlDateTime {
 
 impl ValueProjector<SqlDate> for SqlDate {
     fn project_value(&self, projection: &mut ParamValue) {
-        projection.project(self, |val, data, _| {
+        projection.project(self, |data, _| {
             let century = (self.year() / 100 + 100) as u8;
             let year = (self.year() % 100 + 100) as u8;
             let month = self.month() as u8;

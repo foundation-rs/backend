@@ -1,7 +1,15 @@
 mod error;
-mod bindings;
-mod constants;
 mod functions;
+
+#[allow(dead_code)]
+#[allow(non_snake_case)]
+#[allow(non_camel_case_types)]
+mod bindings;
+
+#[allow(dead_code)]
+#[allow(non_snake_case)]
+#[allow(non_camel_case_types)]
+mod constants;
 
 pub use std::ffi::CString;
 

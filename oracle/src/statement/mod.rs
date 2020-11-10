@@ -36,7 +36,7 @@ pub struct Statement<'conn, P> where P: ParamsProvider {
     conn:    &'conn Connection,
     stmthp:  *mut oci::OCIStmt,
 
-    params:  ParamsProcessor<'conn, P>,
+    params:  ParamsProcessor<P>,
     _params: std::marker::PhantomData<P>
 }
 

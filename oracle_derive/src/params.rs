@@ -87,7 +87,7 @@ fn generate_project_values(cont: &Container) -> TokenStream {
 //     ]
 fn generate_members(cont: &Container) -> TokenStream {
     let expressions = cont.data.all_fields().map(|f| {
-        let mut ty = f.ty;
+        let ty = f.ty;
 
         let convert_to_string =
             if let syn::Type::Reference(x) = ty {

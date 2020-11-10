@@ -59,7 +59,7 @@ impl <'a> Container <'a> {
         cx: &Ctxt,
         item: &'a syn::DeriveInput
     ) -> Option<Container<'a>> {
-        let mut data = match &item.data {
+        let data = match &item.data {
             syn::Data::Enum(data) => Data::Enum(enum_from_ast(cx, &data.variants)),
             syn::Data::Struct(data) => {
                 let (style, fields) = struct_from_ast(cx, &data.fields);
