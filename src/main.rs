@@ -18,9 +18,11 @@ fn main() -> Result<(), String> {
 
     let tables = load(&conn, &conf.excludes)
         .map_err(|err| format!("Can not read metainfo about oracle tables: {}", err))?;
+    /*
     for t in &tables {
-        println!("t {}.{}; rows: {}", t.owner, t.table_name, t.num_rows);
+        println!("{}.{}; rows: {}", t.owner, t.table_name, t.num_rows);
     }
+    */
     println!("total tables: {}", tables.len());
 
     let end = chrono::offset::Local::now();
@@ -87,10 +89,12 @@ pub fn load(conn: &oracle::Connection, excludes: &Vec<String>) -> Result<Vec<Ora
 
     for v in query.fetch_iter(())? {
         if let Ok(v) = v {
+            println!("{}.{}; rows: {}", &v.owner, &v.table_name, &v.num_rows);
             // let params = OraTableColumnParams { own: &v.owner, nm: &v.table_name };
             let columns = colmns_query.fetch_list((v.owner.as_ref(), v.table_name.as_ref()))?;
             for c in columns {
-                // println!("   c {} {}", c.column_name, c.data_type);
+                let nn = if c.nullable == "Y" { "" } else { "NOT NULL" };
+                println!("   c {} {}({}) {}", c.column_name, c.data_type, c.data_length, nn);
                 columns_cnt +=1;
             }
             result.push(v);

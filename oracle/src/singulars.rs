@@ -37,7 +37,7 @@ impl_results_provider!(i32, I32_SQLTYPE);
 impl_results_provider!(bool, BOOL_SQLTYPE);
 
 impl_results_provider!(SqlDate, DATE_SQLTYPE);
-impl_results_provider!(SqlDateTime, TIMESTAMP_SQLTYPE);
+impl_results_provider!(SqlDateTime, DATETIME_SQLTYPE);
 
 
 impl ResultsProvider for String {

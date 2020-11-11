@@ -63,7 +63,7 @@ pub trait DescriptorsProvider {
 }
 
 #[derive(Debug)]
-pub enum SqlType {  Bool, Int16, Int32, Int64, Float, Date, Timestamp, String }
+pub enum SqlType {  Bool, Int16, Int32, Int64, Float, Date, DateTime, Timestamp, String }
 
 /// incapsulate Oracle SQL Types
 #[derive(Debug)]
@@ -104,9 +104,10 @@ type_desc!(f64, F64_SQLTYPE, Float, SQLT_FLT);
 // Boolean type
 type_desc!(bool, BOOL_SQLTYPE, Bool, SQLT_INT);
 
-// Datetime type
+// Date and Datetime type
 pub const DATE_SQLTYPE: TypeDescriptor = TypeDescriptor::new(SqlType::Date, constants::SQLT_DAT, 7 );
-pub const TIMESTAMP_SQLTYPE: TypeDescriptor = TypeDescriptor::new(SqlType::Timestamp, constants::SQLT_TIMESTAMP, 11 );
+pub const DATETIME_SQLTYPE: TypeDescriptor = TypeDescriptor::new(SqlType::DateTime, constants::SQLT_DAT, 7 );
+// pub const TIMESTAMP_SQLTYPE: TypeDescriptor = TypeDescriptor::new(SqlType::Timestamp, constants::SQLT_TIMESTAMP, 11 );
 
 pub trait TypeDescriptorProducer<T> {
     fn produce() -> TypeDescriptor {
@@ -173,3 +174,5 @@ impl TypeDescriptorProducer<&str> for &str {
 use crate::sql_types::*;
 
 impl_descriptors_producer!(SqlDate, DATE_SQLTYPE);
+impl_descriptors_producer!(SqlDateTime, DATE_SQLTYPE);
+// impl_descriptors_producer!(SqlTimestamp, TIMESTAMP_SQLTYPE);

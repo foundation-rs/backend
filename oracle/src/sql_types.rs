@@ -12,8 +12,8 @@ pub type SqlDate = Date<Local>;
 // converts to Oracle Datetime (7 bytes)
 pub type SqlDateTime = DateTime<Local>;
 
-/// converts to Oracle Timestamp (11 bytes)
-pub type SqlTimestamp = DateTime<Local>;
+// converts to Oracle Timestamp (11 bytes)
+// pub type SqlTimestamp = DateTime<Local>;
 
 // TODO: construct Varchar from String or &str
 // TODO: deref Varchar into String or &str

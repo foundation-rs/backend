@@ -5,7 +5,7 @@ use crate::statement::{ParamValue, ResultValue};
 use crate::ValueProjector;
 
 // integer types, must be used only for primitive types
-
+// TODO: optional types (ValueProjector)
 macro_rules! convert_sql_and_primitive {
     ($T:ty) => {
 
@@ -125,57 +125,99 @@ use crate::sql_types::*;
 
 impl From<&ResultValue> for SqlDate {
     fn from(v: &ResultValue) -> SqlDate {
-        v.map_or(Local::now().date(),|valp,len| {
-            assert!(len == 7, "Oracle Date length must be 7 bypes");
-            let vec = unsafe { transmute::<*const u8, &[u8; 7]>(valp) };
-
-            let y = (vec[0] as i32 - 100)*100 + vec[1] as i32 - 100;
-            let m = vec[2] as u32;
-            let d = vec[3] as u32;
-
-            Local.ymd(y,m,d)
-        })
+        v.map_or(Local::now().date(),SqlDate::from_row)
     }
 }
 
 impl From<&ResultValue> for SqlDateTime {
     fn from(v: &ResultValue) -> SqlDateTime {
-        v.map_or(Local::now(),|valp,len| {
-            assert!(len == 11, "Oracle Date length must be 11 bypes");
-            let vec = unsafe { transmute::<*const u8, &[u8; 11]>(valp) };
+        v.map_or(Local::now(),SqlDateTime::from_row)
+    }
+}
 
-            let y = (vec[0] as i32 - 100)*100 + vec[1] as i32 - 100;
-            let m = vec[2] as u32;
-            let d = vec[3] as u32;
+impl From<&ResultValue> for Option<SqlDate> {
+    fn from(v: &ResultValue) -> Option<SqlDate> {
+        v.map(date_from_row)
+    }
+}
 
-            let hh = vec[4] as u32;
-            let mm = vec[5] as u32;
-            let ss = vec[6] as u32;
-
-            Local.ymd(y,m,d).and_hms(hh,mm,ss)
-        })
+impl From<&ResultValue> for Option<SqlDateTime> {
+    fn from(v: &ResultValue) -> Option<SqlDateTime> {
+        v.map(datetime_from_row)
     }
 }
 
 impl ValueProjector<SqlDate> for SqlDate {
     fn project_value(&self, projection: &mut ParamValue) {
-        projection.project(self, |data, _| {
-            let century = (self.year() / 100 + 100) as u8;
-            let year = (self.year() % 100 + 100) as u8;
-            let month = self.month() as u8;
-            let day = self.day() as u8;
-            unsafe {
-                *data = century;
-                *data.offset(1) = year;
-                *data.offset(2) = month;
-                *data.offset(3) = day;
-                *data.offset(4) = 1;  // hour
-                *data.offset(5) = 1;  // minute
-                *data.offset(6) = 1;  // second
-                0
-            }
-        });
+        projection.project(self, |data, _| date_to_row(self, data));
     }
 }
 
-// TODO: optional converters for date and datetime
+
+impl ValueProjector<SqlDate> for SqlDateTime {
+    fn project_value(&self, projection: &mut ParamValue) {
+        projection.project(self, |data, _| datetime_to_row(self, data));
+    }
+}
+
+
+// TODO: optional converters (ValueProjector) for date and datetime
+
+fn date_from_row(valp: *const u8, len: u16) -> Date<Local> {
+    assert!(len == 7, "Oracle Date length must be 7 bypes");
+    let vec = unsafe { transmute::<*const u8, &[u8; 7]>(valp) };
+
+    let y = (vec[0] as i32 - 100)*100 + vec[1] as i32 - 100;
+    let m = vec[2] as u32;
+    let d = vec[3] as u32;
+
+    Local.ymd(y,m,d)
+}
+
+fn date_to_row(source: &Date<Local>, data: *mut u8) -> usize {
+    let century = (source.year() / 100 + 100) as u8;
+    let year = (source.year() % 100 + 100) as u8;
+    unsafe {
+        *data = century;
+        *data.offset(1) = year;
+        *data.offset(2) = source.month() as u8;
+        *data.offset(3) = source.day() as u8;
+        *data.offset(4) = 1;  // hour
+        *data.offset(5) = 1;  // minute
+        *data.offset(6) = 1;  // second
+        0
+    }
+}
+
+
+fn datetime_from_row(valp: *const u8, len: u16) -> DateTime<Local> {
+    assert!(len == 7, "Oracle Datetime length must be 7 bypes");
+    // assert!(len == 11, "Oracle Date length must be 11 bypes");
+    let vec = unsafe { transmute::<*const u8, &[u8; 11]>(valp) };
+
+    let y = (vec[0] as i32 - 100) * 100 + vec[1] as i32 - 100;
+    let m = vec[2] as u32;
+    let d = vec[3] as u32;
+
+    let hh = vec[4] as u32;
+    let mm = vec[5] as u32;
+    let ss = vec[6] as u32;
+
+    Local.ymd(y, m, d).and_hms(hh, mm, ss)
+}
+
+fn datetime_to_row(source: &DateTime<Local>, data: *mut u8) -> usize {
+    let century = (source.year() / 100 + 100) as u8;
+    let year = (source.year() % 100 + 100) as u8;
+    unsafe {
+        *data = century;
+        *data.offset(1) = year;
+        *data.offset(2) = source.month() as u8;
+        *data.offset(3) = source.day() as u8;
+        *data.offset(4) = source.hour() as u8;    // may be need + 1?
+        *data.offset(5) = source.minute() as u8;  // may be need + 1?
+        *data.offset(6) = source.second() as u8;  // may be need + 1?
+        0
+    }
+}
+
