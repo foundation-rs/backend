@@ -125,13 +125,13 @@ use crate::sql_types::*;
 
 impl From<&ResultValue> for SqlDate {
     fn from(v: &ResultValue) -> SqlDate {
-        v.map_or(Local::now().date(),SqlDate::from_row)
+        v.map_or(Local::now().date(),date_from_row)
     }
 }
 
 impl From<&ResultValue> for SqlDateTime {
     fn from(v: &ResultValue) -> SqlDateTime {
-        v.map_or(Local::now(),SqlDateTime::from_row)
+        v.map_or(Local::now(),datetime_from_row)
     }
 }
 
