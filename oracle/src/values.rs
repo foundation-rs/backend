@@ -46,6 +46,7 @@ convert_sql_and_primitive!(u64);
 
 convert_sql_and_primitive!(f64);
 
+// TODO: From for Varchar, ValueProjector for Varchar
 
 // String type, in Oracle NULL String is Empty String
 

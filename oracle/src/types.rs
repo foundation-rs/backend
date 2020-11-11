@@ -62,52 +62,48 @@ pub trait DescriptorsProvider {
     fn sql_descriptors() -> Vec<TypeDescriptor>;
 }
 
-#[derive(Debug)]
-pub enum SqlType {  Bool, Int16, Int32, Int64, Float, Date, DateTime, Timestamp, String }
-
 /// incapsulate Oracle SQL Types
 #[derive(Debug)]
 pub struct TypeDescriptor {
-    sql_type:          SqlType,
     pub(crate) dtype: u16,
     pub(crate) size:  usize
 }
 
 impl TypeDescriptor {
-    const fn new_typed<T>(sql_type: SqlType, dtype: u16) -> TypeDescriptor {
-        TypeDescriptor { sql_type, dtype, size: size_of::<T>()}
+    const fn new_typed<T>(dtype: u16) -> TypeDescriptor {
+        TypeDescriptor { dtype, size: size_of::<T>()}
     }
 
-    const fn new(sql_type: SqlType, dtype: u16, size: usize) -> TypeDescriptor {
-        TypeDescriptor { sql_type, dtype, size }
+    const fn new(dtype: u16, size: usize) -> TypeDescriptor {
+        TypeDescriptor { dtype, size }
     }
 }
 
 macro_rules! type_desc {
-    ($T:ty, $name:ident, $en:ident, $ora:ident) => {
-        pub const $name: TypeDescriptor = TypeDescriptor::new_typed::<$T>(SqlType::$en, constants::$ora );
+    ($T:ty, $name:ident, $ora:ident) => {
+        pub const $name: TypeDescriptor = TypeDescriptor::new_typed::<$T>(constants::$ora );
     }
 }
 
 // Interger types, signed and unsigned
-type_desc!(i16, I16_SQLTYPE, Int16, SQLT_INT);
-type_desc!(i32, I32_SQLTYPE, Int32, SQLT_INT);
-type_desc!(i64, I64_SQLTYPE, Int64, SQLT_INT);
+type_desc!(i16, I16_SQLTYPE, SQLT_INT);
+type_desc!(i32, I32_SQLTYPE, SQLT_INT);
+type_desc!(i64, I64_SQLTYPE, SQLT_INT);
 
-type_desc!(u16, U16_SQLTYPE, Int16, SQLT_INT);
-type_desc!(u32, U32_SQLTYPE, Int32, SQLT_INT);
-type_desc!(u64, U64_SQLTYPE, Int64, SQLT_INT);
+type_desc!(u16, U16_SQLTYPE, SQLT_INT);
+type_desc!(u32, U32_SQLTYPE, SQLT_INT);
+type_desc!(u64, U64_SQLTYPE, SQLT_INT);
 
 // Float type
-type_desc!(f64, F64_SQLTYPE, Float, SQLT_FLT);
+type_desc!(f64, F64_SQLTYPE, SQLT_FLT);
 
 // Boolean type
-type_desc!(bool, BOOL_SQLTYPE, Bool, SQLT_INT);
+type_desc!(bool, BOOL_SQLTYPE, SQLT_INT);
 
 // Date and Datetime type
-pub const DATE_SQLTYPE: TypeDescriptor = TypeDescriptor::new(SqlType::Date, constants::SQLT_DAT, 7 );
-pub const DATETIME_SQLTYPE: TypeDescriptor = TypeDescriptor::new(SqlType::DateTime, constants::SQLT_DAT, 7 );
-// pub const TIMESTAMP_SQLTYPE: TypeDescriptor = TypeDescriptor::new(SqlType::Timestamp, constants::SQLT_TIMESTAMP, 11 );
+pub const DATE_SQLTYPE: TypeDescriptor = TypeDescriptor::new(constants::SQLT_DAT, 7 );
+pub const DATETIME_SQLTYPE: TypeDescriptor = TypeDescriptor::new(constants::SQLT_DAT, 7 );
+// pub const TIMESTAMP_SQLTYPE: TypeDescriptor = TypeDescriptor::new(constants::SQLT_TIMESTAMP, 11 );
 
 pub trait TypeDescriptorProducer<T> {
     fn produce() -> TypeDescriptor {
@@ -147,7 +143,7 @@ impl_descriptors_producer!(bool, BOOL_SQLTYPE);
 // all about String type
 
 pub fn string_sqltype(capacity: usize) -> TypeDescriptor {
-    TypeDescriptor::new( SqlType::String, constants::SQLT_CHR, capacity + 2)
+    TypeDescriptor::new(constants::SQLT_CHR, capacity + 2)
 }
 
 impl TypeDescriptorProducer<String> for String {
@@ -162,6 +158,15 @@ impl TypeDescriptorProducer<String> for String {
 impl TypeDescriptorProducer<&str> for &str {
     fn produce() -> TypeDescriptor {
         Self::produce_sized(128)
+    }
+    fn produce_sized(capacity: usize) -> TypeDescriptor {
+        string_sqltype(capacity)
+    }
+}
+
+impl <'a, const PREFETCH: usize> TypeDescriptorProducer<Varchar<'a, PREFETCH>> for Varchar<'a, PREFETCH> {
+    fn produce() -> TypeDescriptor {
+        Self::produce_sized(PREFETCH)
     }
     fn produce_sized(capacity: usize) -> TypeDescriptor {
         string_sqltype(capacity)

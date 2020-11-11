@@ -1,0 +1,25 @@
+<config>
+  <connection>
+    <url>oracle-linux.apa-canal.md:1521/ACC</url>
+    <user>SYSTEM</user>
+    <pw>_REACTIVITY18</pw>
+  </connection>
+  <excludes>
+    <scheme>APEX_040200</scheme>
+    <scheme>APPQOSSYS</scheme>
+    <scheme>AUDSYS</scheme>
+    <scheme>COPIE</scheme>
+    <scheme>CTXSYS</scheme>
+    <scheme>DBSNMP</scheme>
+    <scheme>GSMADMIN_INTERNAL</scheme>
+    <scheme>FLOWS_FILES</scheme>
+    <scheme>MDSYS</scheme>
+    <scheme>OJVMSYS</scheme>
+    <scheme>ORDDATA</scheme>
+    <scheme>ORDSYS</scheme>
+    <scheme>SYS</scheme>
+    <scheme>SYSTEM</scheme>
+    <scheme>WMSYS</scheme>
+    <scheme>XDB</scheme>
+  </excludes>
+</config>

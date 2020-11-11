@@ -39,7 +39,6 @@ impl_results_provider!(bool, BOOL_SQLTYPE);
 impl_results_provider!(SqlDate, DATE_SQLTYPE);
 impl_results_provider!(SqlDateTime, DATETIME_SQLTYPE);
 
-
 impl ResultsProvider for String {
     fn from_resultset(rs: &ResultSet) -> Self {
         let s0 = &(rs[0]);
@@ -49,6 +48,8 @@ impl ResultsProvider for String {
         vec![string_sqltype(128)]
     }
 }
+
+// TODO: impl ResultsProvider for Varchar
 
 // implement params provider for singular type
 impl <T> ParamsProvider for T
