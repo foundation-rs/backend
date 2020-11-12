@@ -24,6 +24,7 @@ pub enum ResultValue {
 
 pub type ResultSet = Vec<ResultValue>;
 
+/// Trait for automatic processing of sql statement results
 pub trait ResultsProvider {
     fn sql_descriptors() -> Vec<TypeDescriptor>;
     fn from_resultset(rs: &ResultSet) -> Self;

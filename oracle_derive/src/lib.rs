@@ -37,7 +37,7 @@ mod params;
 //     }
 // }
 ///
-#[proc_macro_derive(Query)]
+#[proc_macro_derive(ResultsProvider)]
 pub fn derive_query(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
@@ -99,7 +99,7 @@ pub fn derive_query(input: TokenStream) -> TokenStream {
 //        }
 //    }
 //}
-#[proc_macro_derive(Params)]
+#[proc_macro_derive(ParamsProvider)]
 pub fn derive_params(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 

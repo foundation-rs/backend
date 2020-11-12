@@ -1,8 +1,7 @@
 
 use std::collections::HashMap;
 
-use oracle;
-use oracle_derive::Query;
+use oracle_derive::ResultsProvider;
 
 pub struct MetaInfo {
     pub schemas:  HashMap<String,Schema>,
@@ -21,7 +20,7 @@ pub struct Table {
     pub columns:     Vec<OraTableColumn>,
 }
 
-#[derive(Query)]
+#[derive(ResultsProvider)]
 pub struct OraTable {
     owner: String,
     table_name: String,
@@ -29,7 +28,7 @@ pub struct OraTable {
     num_rows: i32
 }
 
-#[derive(Query)]
+#[derive(ResultsProvider)]
 pub struct OraTableColumn {
     column_id: i16,
     owner: String,

@@ -32,6 +32,7 @@ pub enum Identifier {
 
 pub type ParamsProjection = Vec<ParamValue>;
 
+/// Trait for automatic processing of sql statement parameters
 pub trait ParamsProvider {
     fn members() -> Vec<Member>;
     fn project_values(&self, projecton: &mut ParamsProjection) -> ();
