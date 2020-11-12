@@ -1,9 +1,8 @@
 <config>
-  <connection>
-    <url>oracle-linux.apa-canal.md:1521/ACC</url>
-    <user>SYSTEM</user>
-    <pw>_REACTIVITY18</pw>
-  </connection>
+  <connection url="oracle-linux.apa-canal.md:1521/ACC"
+              user="SYSTEM"
+              pw="_REACTIVITY18"
+  />
   <excludes>
     <scheme>APEX_040200</scheme>
     <scheme>APPQOSSYS</scheme>

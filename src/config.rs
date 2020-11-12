@@ -1,24 +1,34 @@
-use serde::{Serialize, Deserialize};
 use std::fs::File;
 use std::io::Read;
 
-#[derive(Serialize, Deserialize, Debug)]
+use serde::{Deserialize};
+use quick_xml::de::from_str;
+
+// https://github.com/tafia/quick-xml
+
+#[derive(Deserialize, Debug, PartialEq)]
+pub struct Config {
+    pub connection: Connection,
+    pub excludes: Excludes,
+}
+
+#[derive(Deserialize, Debug, PartialEq)]
 pub struct Connection {
     pub url: String,
     pub user: String,
     pub pw: String
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct Config {
-    pub connection: Connection,
-    pub excludes: Vec<String>,
+#[derive(Deserialize, Debug, PartialEq)]
+pub struct Excludes {
+    #[serde(rename = "scheme", default)]
+    pub schemes: Vec<String>,
 }
 
-pub fn load(filename: &str) -> Result<Config, &'static str> {
-    let mut file = File::open(filename).map_err(|_err| "Can not open config file")?;
+pub fn load(filename: &str) -> Result<Config, String> {
+    let mut file = File::open(filename).map_err(|err| format!("Can not open config file: {}", err))?;
     let mut data = String::new();
-    file.read_to_string(&mut data).map_err(|_err| "Can not read config file")?;
+    file.read_to_string(&mut data).map_err(|err| format!("Can not read config file: {}", err))?;
 
-    serde_json::from_str(&data).map_err(|_err| "Can not parse config file")
+    from_str(&data).map_err(|err| format!("Can not parse config file: {}", err))
 }
