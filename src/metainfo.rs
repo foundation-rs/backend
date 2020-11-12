@@ -8,35 +8,36 @@ pub struct MetaInfo {
 }
 
 pub struct Schema {
-    pub tables:  HashMap<String,Table>,
+    pub tables:  HashMap<String,TableInfo>,
 }
 
-#[derive(Debug, PartialEq)]
-pub enum TableType { Table, View }
-
-pub struct Table {
-    pub table_type: TableType,
-    pub num_rows:    i32,
-    pub columns:     Vec<OraTableColumn>,
+pub struct TableInfo {
+    pub is_view:   bool,
+    pub temporary: bool,
+    pub num_rows:  i32,
+    pub columns:   Vec<OraTableColumn>,
 }
 
 #[derive(ResultsProvider)]
 pub struct OraTable {
-    owner: String,
+    owner:      String,
     table_name: String,
     table_type: String,
-    num_rows: i32
+    num_rows:   i32,
+    temporary:  String,
 }
 
 #[derive(ResultsProvider)]
 pub struct OraTableColumn {
-    column_id: i16,
-    owner: String,
-    table_name: String,
-    column_name: String,
-    data_type: String,
-    data_length: i16,
-    nullable: String
+    column_id:      i16,
+    owner:          String,
+    table_name:     String,
+    column_name:    String,
+    data_type:      String,
+    data_length:    i16,
+    data_precision: i16,
+    data_scale:     i16,
+    nullable:       String
 }
 
 impl MetaInfo {
@@ -50,15 +51,17 @@ impl MetaInfo {
 
     fn load(conn: &oracle::Connection, excludes: &str)-> oracle::OracleResult<HashMap<String,Schema>> {
         let sql = format!(
-            "SELECT OWNER, TABLE_NAME, TABLE_TYPE, NUM_ROWS FROM (
-            SELECT OWNER, TABLE_NAME, 'TABLE' AS TABLE_TYPE, NUM_ROWS FROM SYS.ALL_TABLES
+            "SELECT OWNER, TABLE_NAME, TABLE_TYPE, NUM_ROWS, TEMPORARY FROM (
+            SELECT OWNER, TABLE_NAME, 'TABLE' AS TABLE_TYPE, NUM_ROWS, TEMPORARY
+            FROM SYS.ALL_TABLES
             UNION
-            SELECT OWNER, VIEW_NAME, 'VIEW' AS TABLE_TYPE, 0 FROM SYS.ALL_VIEWS 
+            SELECT OWNER, VIEW_NAME, 'VIEW' AS TABLE_TYPE, 0, 'N'
+            FROM SYS.ALL_VIEWS 
             ) WHERE OWNER NOT IN ( {} )
             ORDER BY OWNER, TABLE_NAME", excludes);
 
         let sql_columns = format!(
-            "SELECT COLUMN_ID, OWNER, TABLE_NAME, COLUMN_NAME, DATA_TYPE, DATA_LENGTH, NULLABLE \
+            "SELECT COLUMN_ID, OWNER, TABLE_NAME, COLUMN_NAME, DATA_TYPE, DATA_LENGTH, DATA_PRECISION, DATA_SCALE, NULLABLE \
             FROM SYS.ALL_TAB_COLUMNS WHERE OWNER NOT IN ( {} ) ORDER BY OWNER, TABLE_NAME, COLUMN_ID", excludes);
     
         // tables and columns queries/iterators are sorted by owner, table_name and synchronized
@@ -82,11 +85,8 @@ impl MetaInfo {
                 let table_name = v.table_name;
                 let num_rows = v.num_rows;
 
-                let table_type = match v.table_type.as_ref() {
-                    "TABLE" => TableType::Table,
-                    "VIEW" => TableType::View,
-                    _ => unreachable!()
-                };
+                let is_view = v.table_type == "VIEW";
+                let temporary = v.temporary == "Y";
 
                 // println!("{}.{}; {:?}; rows: {}", owner, &table_name, &v.table_type, &num_rows);
 
@@ -118,7 +118,7 @@ impl MetaInfo {
                 }
 
                 let schema = result.entry(v.owner).or_insert_with(|| Schema { tables: HashMap::with_capacity(100) });
-                schema.tables.entry(table_name).or_insert(Table { table_type, num_rows, columns });
+                schema.tables.entry(table_name).or_insert(TableInfo { is_view, temporary, num_rows, columns });
             };
         }            
     

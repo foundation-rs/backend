@@ -15,7 +15,7 @@ fn main() -> Result<(), String> {
     let mi =  metainfo::MetaInfo::new(&conn, &conf.excludes.schemes)
                 .map_err(|err| format!("Can not read metainfo about oracle tables: {}", err))?;
 
-    println!("TOTAL: {} schemas with {} tables & views and {} columns",
+    println!("TOTAL:   {} schemas with {} tables & views and {} columns",
         &mi.schemas.len(), 
         &mi.schemas.values().map(|s|s.tables.len()).sum::<usize>(),
         &mi.schemas.values().map(|s|s.tables.values().map(|t|t.columns.len()).sum::<usize>()).sum::<usize>()
