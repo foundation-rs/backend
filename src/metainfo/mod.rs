@@ -1,21 +1,28 @@
 
 use std::collections::HashMap;
+use std::rc::Rc;
 
+use oracle;
 use oracle_derive::ResultsProvider;
+use crate::utils;
 
 pub struct MetaInfo {
-    pub schemas:  HashMap<String,Schema>,
+    pub schemas:  HashMap<Rc<String>,SchemaInfo>,
 }
 
-pub struct Schema {
-    pub tables:  HashMap<String,TableInfo>,
+pub struct SchemaInfo {
+    pub name:    Rc<String>,
+    pub tables:  HashMap<Rc<String>,TableInfo>,
 }
 
 pub struct TableInfo {
-    pub is_view:   bool,
-    pub temporary: bool,
-    pub num_rows:  i32,
-    pub columns:   Vec<ColumnInfo>,
+    pub name:        Rc<String>,
+    pub is_view:     bool,
+    pub temporary:   bool,
+    pub num_rows:    i32,
+    pub columns:     Vec<ColumnInfo>,
+    pub primary_key: Option<PrimaryKey>,
+    pub indexes:     Vec<Index>
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -35,8 +42,24 @@ pub struct ColumnInfo {
     pub buffer_len:     usize
 }
 
+pub struct PrimaryKey {
+    pub name:    String,
+    pub columns: Vec<String>
+}
+
+pub struct Index {
+    pub name:    String,
+    pub unique:  bool,
+    pub columns: Vec<IndexColumn>
+}
+
+pub struct IndexColumn {
+    pub name: String,
+    pub desc: bool
+}
+
 #[derive(ResultsProvider)]
-pub struct OraTable {
+struct OraTable {
     owner:      String,
     table_name: String,
     table_type: String,
@@ -45,7 +68,7 @@ pub struct OraTable {
 }
 
 #[derive(ResultsProvider)]
-pub struct OraTableColumn {
+struct OraTableColumn {
     owner:          String,
     table_name:     String,
     column_name:    String,
@@ -65,7 +88,7 @@ impl MetaInfo {
         Ok( MetaInfo { schemas })
     }
 
-    fn load(conn: &oracle::Connection, excludes: &str)-> oracle::OracleResult<HashMap<String,Schema>> {
+    fn load(conn: &oracle::Connection, excludes: &str)-> oracle::OracleResult<HashMap<Rc<String>,SchemaInfo>> {
         let sql = format!(
             "SELECT OWNER, TABLE_NAME, TABLE_TYPE, NUM_ROWS, TEMPORARY FROM (
             SELECT OWNER, TABLE_NAME, 'TABLE' AS TABLE_TYPE, NUM_ROWS, TEMPORARY
@@ -93,12 +116,14 @@ impl MetaInfo {
             .query_many::<OraTableColumn, 1000>()?;
 
         let mut columns_iterator = columns_query.fetch_iter(())?;
+
+        let mut current_schema = None;
         let mut previous_column: Option<OraTableColumn> = None;
 
         for v in query.fetch_iter(())? {
             if let Ok(v) = v {
                 let ref owner = v.owner;
-                let table_name = v.table_name;
+                let table_name = v.table_name.clone();
                 let num_rows = v.num_rows;
 
                 let is_view = v.table_type == "VIEW";
@@ -118,8 +143,7 @@ impl MetaInfo {
                         let ref c_owner = c.owner;
                         let ref c_table_name = c.table_name;
 
-                        // let nn = if c.nullable == "Y" { "" } else { "NOT NULL" };
-                        // print!("     {}::{}.{} {}({}) {}", c_owner, c_table_name, &c.column_name, &c.data_type, c.data_length, nn);
+                        // print!("     {}::{}.{} {}({})", c_owner, c_table_name, &c.column_name, &c.data_type, c.data_length);
     
                         if c_owner == owner && c_table_name == &table_name {
                             // println!("   push");
@@ -133,13 +157,27 @@ impl MetaInfo {
                     }
                 }
 
-                let schema = result.entry(v.owner).or_insert_with(|| Schema { tables: HashMap::with_capacity(100) });
-                schema.tables.entry(table_name).or_insert(TableInfo { is_view, temporary, num_rows, columns });
+                let (schema,old_schema) = 
+                    utils::get_or_insert_with_condition(
+                        &mut current_schema, 
+                        || SchemaInfo { name: Rc::new(v.owner.clone()), tables: HashMap::with_capacity(100) }, 
+                        |s| s.name.as_ref() == &v.owner);
+
+                if let Some(old_schema) = old_schema {
+                    result.insert(old_schema.name.clone(), old_schema);
+                };
+               
+                let table_name = Rc::new(table_name);
+                schema.tables.insert(table_name.clone(), TableInfo { name: table_name, is_view, temporary, num_rows, columns, primary_key: None, indexes: Vec::new() });
+                
+                // let schema = result.entry(v.owner).or_insert_with(|| Schema { tables: HashMap::with_capacity(100) });
+                // schema.tables.entry(table_name.clone()).or_insert(TableInfo { name: table_name, is_view, temporary, num_rows, columns, primary_key: None, indexes: Vec::new() });
             };
         }            
     
         Ok(result)
     }
+
     
     /*
     fn load(conn: &oracle::Connection, excludes: &Vec<String>) -> oracle::OracleResult<Vec<OraTable>> {
