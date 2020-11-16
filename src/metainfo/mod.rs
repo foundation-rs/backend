@@ -1,28 +1,17 @@
 mod types;
-mod table_stream;
+mod iterate_columns;
+mod iterate_tables;
 
 use std::collections::HashMap;
 use std::rc::Rc;
 
 use oracle;
-use oracle_derive::ResultsProvider;
 use crate::utils;
 
 pub use types::*;
 
-use table_stream::*;
-
-#[derive(ResultsProvider)]
-struct OraTableColumn {
-    owner:          String,
-    table_name:     String,
-    column_name:    String,
-    data_type:      String,
-    data_length:    u16,
-    data_precision: u16,
-    data_scale:     u16,
-    nullable:       String
-}
+use iterate_columns::*;
+use iterate_tables::*;
 
 impl MetaInfo {
     pub fn new(conn: &oracle::Connection, excludes: &Vec<String>) -> oracle::OracleResult<MetaInfo> {
@@ -34,30 +23,17 @@ impl MetaInfo {
     }
 
     fn load(conn: &oracle::Connection, excludes: &str)-> oracle::OracleResult<HashMap<Rc<String>,SchemaInfo>> {
-        let mut table_stream = OraTableStreamSource::stream(conn, excludes)?;
+        let tables_iterator = fetch_tables(conn, excludes)?;
+        let mut columns_iterator = fetch_columns(conn, excludes)?;
 
-        let sql_columns = format!(
-            "SELECT OWNER, TABLE_NAME, COLUMN_NAME, DATA_TYPE, DATA_LENGTH, DATA_PRECISION, DATA_SCALE, NULLABLE \
-            FROM SYS.ALL_TAB_COLUMNS WHERE OWNER NOT IN ( {} ) ORDER BY OWNER, TABLE_NAME, COLUMN_ID", excludes);
-    
         // tables and columns queries/iterators are sorted by owner, table_name and synchronized
 
         let mut result = HashMap::with_capacity(5000);
 
-        let columns_query = conn
-            .prepare(&sql_columns)?
-            .query_many::<OraTableColumn, 1000>()?;
-
-        let mut columns_iterator = columns_query.fetch_iter(())?;
-
         let mut current_schema = None;
         let mut previous_column: Option<OraTableColumn> = None;
 
-        let table_iterator = &mut table_stream.iterator;
-
-        // println!("before fetch");
-
-        for v in table_iterator {
+        for v in tables_iterator {
             // println!("first fetch");
 
             if let Ok(v) = v {

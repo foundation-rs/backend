@@ -31,7 +31,7 @@ pub struct QueryIterator<'iter, 'conn: 'iter, P, R, const PREFETCH: usize> where
 
 impl <'conn,P,R: 'conn,const PREFETCH: usize> Query<'conn,P,R,PREFETCH> where P: ParamsProvider, R: ResultsProvider {
     pub(crate) fn new(stmt: Statement<'conn,P>) -> OracleResult<Query<'conn,P,R,PREFETCH>> {
-        let results = Box::new( ResultProcessor::new(stmt.conn, stmt.stmthp, PREFETCH)? );
+        let results = box ResultProcessor::new(stmt.conn, stmt.stmthp, PREFETCH)?;
         Ok( Query { stmt, results, _result: PhantomData })
     }
 
@@ -39,9 +39,12 @@ impl <'conn,P,R: 'conn,const PREFETCH: usize> Query<'conn,P,R,PREFETCH> where P:
         assert!(PREFETCH > 1);
         self.stmt.set_params(params)?;
         
+        // transmute boxed ResultIterator into raw pointer
+        // because Rust have problems with self-referencials structs
         let iterator_ptr = {
-            let iterator = Box::new( self.results.fetch_iter()? );
+            let iterator = box self.results.fetch_iter()?;
             // println!("fetch_iter::ResultIterator::boxed");
+            // by transmute rust don't auto-drop raw pointer and forget to drop iterator
             unsafe { core::mem::transmute(iterator) }
         };
 
@@ -88,6 +91,8 @@ impl <'iter, 'conn: 'iter, P, R, const PREFETCH: usize> QueryIterator<'iter,'con
         QueryIterator { query: Some(query), iterator_ptr }
     }
 
+    // consume iterator and extract query
+    // we must use Option because we implement Drop trait for manually drop inner iterator
     pub fn release(mut self) -> Query<'conn,P,R,PREFETCH> {
         self.query.take().unwrap()
     }
@@ -105,6 +110,7 @@ impl <'conn, 'iter: 'conn, P, R, const PREFETCH: usize> Iterator for QueryIterat
 
 impl <'conn, 'iter: 'conn, P, R, const PREFETCH: usize> Drop for QueryIterator<'conn, 'iter, P, R, PREFETCH> where P: ParamsProvider, R: ResultsProvider {
     fn drop(&mut self) {
+        // manually drop ResultIterator with transmute it from raw pointer to original boxed value
         let _boxed: Box<ResultIterator<'_, '_, R>> = unsafe { core::mem::transmute(self.iterator_ptr) };
     }
 }

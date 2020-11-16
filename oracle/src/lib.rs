@@ -1,3 +1,4 @@
+#![feature(box_syntax)]
 #![feature(min_const_generics)]
 
 mod environment;
