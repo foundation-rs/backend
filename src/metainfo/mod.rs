@@ -1,3 +1,5 @@
+mod types;
+mod table_stream;
 
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -6,66 +8,9 @@ use oracle;
 use oracle_derive::ResultsProvider;
 use crate::utils;
 
-pub struct MetaInfo {
-    pub schemas:  HashMap<Rc<String>,SchemaInfo>,
-}
+pub use types::*;
 
-pub struct SchemaInfo {
-    pub name:    Rc<String>,
-    pub tables:  HashMap<Rc<String>,TableInfo>,
-}
-
-pub struct TableInfo {
-    pub name:        Rc<String>,
-    pub is_view:     bool,
-    pub temporary:   bool,
-    pub num_rows:    i32,
-    pub columns:     Vec<ColumnInfo>,
-    pub primary_key: Option<PrimaryKey>,
-    pub indexes:     Vec<Index>
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum ColumnType {
-    Int16, Int32, Int64, Float64, Varchar, DateTime, Blob, Clob, Long, Unsupported
-}
-
-pub struct ColumnInfo {
-    pub name:           String,
-    pub col_type:       ColumnType,
-    pub col_type_name:  String,
-    pub oci_data_type:  u16,
-    pub col_len:        u16,
-    pub nullable:       bool,
-    pub data_precision: u16,
-    pub data_scale:     u16,
-    pub buffer_len:     usize
-}
-
-pub struct PrimaryKey {
-    pub name:    String,
-    pub columns: Vec<String>
-}
-
-pub struct Index {
-    pub name:    String,
-    pub unique:  bool,
-    pub columns: Vec<IndexColumn>
-}
-
-pub struct IndexColumn {
-    pub name: String,
-    pub desc: bool
-}
-
-#[derive(ResultsProvider)]
-struct OraTable {
-    owner:      String,
-    table_name: String,
-    table_type: String,
-    num_rows:   i32,
-    temporary:  String,
-}
+use table_stream::*;
 
 #[derive(ResultsProvider)]
 struct OraTableColumn {
@@ -89,15 +34,7 @@ impl MetaInfo {
     }
 
     fn load(conn: &oracle::Connection, excludes: &str)-> oracle::OracleResult<HashMap<Rc<String>,SchemaInfo>> {
-        let sql = format!(
-            "SELECT OWNER, TABLE_NAME, TABLE_TYPE, NUM_ROWS, TEMPORARY FROM (
-            SELECT OWNER, TABLE_NAME, 'TABLE' AS TABLE_TYPE, NUM_ROWS, TEMPORARY
-            FROM SYS.ALL_TABLES
-            UNION
-            SELECT OWNER, VIEW_NAME, 'VIEW' AS TABLE_TYPE, 0, 'N'
-            FROM SYS.ALL_VIEWS 
-            ) WHERE OWNER NOT IN ( {} )
-            ORDER BY OWNER, TABLE_NAME", excludes);
+        let mut table_stream = OraTableStreamSource::stream(conn, excludes)?;
 
         let sql_columns = format!(
             "SELECT OWNER, TABLE_NAME, COLUMN_NAME, DATA_TYPE, DATA_LENGTH, DATA_PRECISION, DATA_SCALE, NULLABLE \
@@ -106,10 +43,6 @@ impl MetaInfo {
         // tables and columns queries/iterators are sorted by owner, table_name and synchronized
 
         let mut result = HashMap::with_capacity(5000);
-
-        let query = conn
-            .prepare(&sql)?
-            .query_many::<OraTable, 1000>()?;
 
         let columns_query = conn
             .prepare(&sql_columns)?
@@ -120,7 +53,13 @@ impl MetaInfo {
         let mut current_schema = None;
         let mut previous_column: Option<OraTableColumn> = None;
 
-        for v in query.fetch_iter(())? {
+        let table_iterator = &mut table_stream.iterator;
+
+        // println!("before fetch");
+
+        for v in table_iterator {
+            // println!("first fetch");
+
             if let Ok(v) = v {
                 let ref owner = v.owner;
                 let table_name = v.table_name.clone();
@@ -173,7 +112,9 @@ impl MetaInfo {
                 // let schema = result.entry(v.owner).or_insert_with(|| Schema { tables: HashMap::with_capacity(100) });
                 // schema.tables.entry(table_name.clone()).or_insert(TableInfo { name: table_name, is_view, temporary, num_rows, columns, primary_key: None, indexes: Vec::new() });
             };
-        }            
+        }        
+        
+        // println!("after fetch");
     
         Ok(result)
     }

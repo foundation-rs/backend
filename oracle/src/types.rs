@@ -164,7 +164,7 @@ impl TypeDescriptorProducer<&str> for &str {
     }
 }
 
-impl <'a, const PREFETCH: usize> TypeDescriptorProducer<Varchar<'a, PREFETCH>> for Varchar<'a, PREFETCH> {
+impl <const PREFETCH: usize> TypeDescriptorProducer<Varchar<PREFETCH>> for Varchar<PREFETCH> {
     fn produce() -> TypeDescriptor {
         Self::produce_sized(PREFETCH)
     }

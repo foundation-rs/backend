@@ -70,13 +70,12 @@ pub(crate) struct ResultProcessor<'conn, R> where R: ResultsProvider {
     _result: std::marker::PhantomData<R>
 }
 
-pub struct QueryIterator<'iter,'conn: 'iter, R> where R: ResultsProvider {
-    processor: &'iter ResultProcessor<'conn, R>,
-    done:      bool,
+pub struct ResultIterator<'iter, 'conn: 'iter, R> where R: ResultsProvider {
+    processor:          &'iter ResultProcessor<'conn, R>,
+    done:               bool,
     initial_prefetched: u32,
-    rows_fetched: u32,
-    cursor_index: u32,
-    _result: std::marker::PhantomData<R>
+    rows_fetched:       u32,
+    cursor_index:       u32
 }
 
 impl <'conn, R> ResultProcessor<'conn, R> where R: ResultsProvider {
@@ -129,38 +128,29 @@ impl <'conn, R> ResultProcessor<'conn, R> where R: ResultsProvider {
         Ok( ResultProcessor {conn, stmthp, prefetch_rows, sizes, allocated_p, allocated_layout, values_p, indicators_p, ret_lengths_p, _result: PhantomData} )
     }
 
-    /// Execute generic statement with prefetch values
-    fn execute_prefetch(&self, iters: u32) -> OracleResult<bool> {
-        oci::stmt_execute(self.conn.svchp, self.stmthp, self.conn.errhp, iters, 0)
+    fn get_last_fetched_rows(&self) -> OracleResult<u32> {
+        let mut rows_fetched: u32 = 0;
+        let rows_fetcher_ptr: *mut u32 = &mut rows_fetched;
+
+        oci::attr_get(self.stmthp as *mut oci::c_void, oci::OCI_HTYPE_STMT, rows_fetcher_ptr as *mut oci::c_void, oci::OCI_ATTR_ROWS_FETCHED, self.conn.errhp)?;
+        Ok(rows_fetched)
     }
 
-    pub(crate) fn fetch_iter<'iter>(&'iter self) ->
-    Result<QueryIterator<'iter, 'conn, R>, oci::OracleError> {
-        let success = self.execute_prefetch(self.prefetch_rows as u32)?;
-        let prefetched = self.initial_fetch(success)?;
+    pub (crate) fn fetch_iter<'iter> (&'conn self) -> OracleResult<ResultIterator<'iter, 'conn, R>> {
+        let iters = self.prefetch_rows as u32;
+        let success = oci::stmt_execute(self.conn.svchp, self.stmthp, self.conn.errhp, iters, 0)?;
 
-        Ok(QueryIterator::new(self, prefetched))
-    }
+        let initial_prefetched = 
+            if success {
+                Ok(self.prefetch_rows as u32)
+            } else {
+                // retrieve real count of fetched rows;
+                self.get_last_fetched_rows()
+            }?;
 
-    pub(crate) fn fetch_list (&self)
-                                  -> Result<Vec<R>, oci::OracleError> {
-        let mut result = Vec::with_capacity(self.prefetch_rows);
+        // println!("initial prefetched: {}", initial_prefetched);
 
-        for v in self.fetch_iter()? {
-            match v {
-                Ok(v) => result.push(v),
-                Err(err) => return Err(err)
-            };
-        }
-        Ok( result )
-    }
-
-    pub(crate) fn fetch_one(&self) -> Result<R, oci::OracleError> {
-        let mut iter = self.fetch_iter()?;
-        match iter.next() {
-            Some(v) => v,
-            None => Err(oci::OracleError::new("The request returned no data".to_owned(), "statement.fetch_one"))
-        }
+        Ok( ResultIterator::new(&self, initial_prefetched) )
     }
 
     fn get_result(&self, index: isize) -> ResultSet {
@@ -194,24 +184,7 @@ impl <'conn, R> ResultProcessor<'conn, R> where R: ResultsProvider {
         result
     }
 
-    fn get_last_fetched_rows(&self) -> OracleResult<u32> {
-        let mut rows_fetched: u32 = 0;
-        let rows_fetcher_ptr: *mut u32 = &mut rows_fetched;
-
-        oci::attr_get(self.stmthp as *mut oci::c_void, oci::OCI_HTYPE_STMT, rows_fetcher_ptr as *mut oci::c_void, oci::OCI_ATTR_ROWS_FETCHED, self.conn.errhp)?;
-        Ok(rows_fetched)
-    }
-
-    fn initial_fetch(&self, success: bool) -> OracleResult<u32> {
-        if success {
-            Ok(self.prefetch_rows as u32)
-        } else {
-            // retrieve real count of fetched rows;
-            self.get_last_fetched_rows()
-        }
-    }
-
-    fn fetch(&self) -> Result<(u32, bool), oci::OracleError> {
+    fn fetch_next(&self) -> OracleResult<(u32, bool)> {
         let mut done = false;
 
         if let Err(error) = oci::stmt_fetch(self.stmthp, self.conn.errhp, self.prefetch_rows as u32, oci::OCI_FETCH_NEXT, 0) {
@@ -237,25 +210,28 @@ impl <R> Drop for ResultProcessor<'_,R> where R: ResultsProvider {
     }
 }
 
-impl <'iter,'conn: 'iter, R> QueryIterator<'iter,'conn, R> where R: ResultsProvider {
-    fn new(processor: &'iter ResultProcessor<'conn, R>, initial_prefetched: u32) -> QueryIterator<'iter,'conn, R> {
-        QueryIterator { processor, done: false, initial_prefetched, rows_fetched: 0, cursor_index: 0, _result: PhantomData }
+impl <'iter, 'conn: 'iter, R> ResultIterator<'iter, 'conn, R> where R: ResultsProvider {
+    fn new(processor: &'conn ResultProcessor<'conn,R>, initial_prefetched: u32) -> ResultIterator<'iter, 'conn, R> {
+        // println!("ResultIterator created");
+        ResultIterator { processor, done: false, initial_prefetched, rows_fetched: 0, cursor_index: 0 }
     }
+
 }
 
-impl <'iter, 'conn: 'iter, R> Iterator for QueryIterator<'iter,'conn, R> where R: ResultsProvider {
+impl <'iter, 'conn: 'iter, R> Iterator for ResultIterator<'iter, 'conn, R> where R: ResultsProvider {
     type Item = oci::OracleResult<R>;
 
     fn next(&mut self) -> Option<oci::OracleResult<R>> {
+        // println!("ResultIterator first fetch");
         if self.done && self.cursor_index == 0 {
             return None;
         }
 
         if self.cursor_index == 0 {
-            // println!("QueryIterator::cursor_index == 0");
+            // println!("ResultIterator::cursor_index == 0");
             // need next fetch
             if self.rows_fetched == 0 {
-                // println!("QueryIterator::need next fetch");
+                // println!("ResultIterator::need next fetch");
                 // this is initial fetch because all next fetches set rows_fetched to real value
                 if self.initial_prefetched == 0 {
                     return None;
@@ -267,8 +243,8 @@ impl <'iter, 'conn: 'iter, R> Iterator for QueryIterator<'iter,'conn, R> where R
                 }
             } else {
                 // subsequent fetches
-                // println!("QueryIterator::subsequent fetches");
-                match self.processor.fetch() {
+                // println!("ResultIterator::subsequent fetches");
+                match self.processor.fetch_next() {
                     Ok((rows_fetched, done)) => {
                         self.rows_fetched = rows_fetched;
                         self.done = done;
@@ -278,7 +254,7 @@ impl <'iter, 'conn: 'iter, R> Iterator for QueryIterator<'iter,'conn, R> where R
                         self.done = true;
                         self.cursor_index = 0;
                         // panic!("error in QueryIterator while fetch: {}", err);
-                        // println!("QueryIterator::Error: {}", err);
+                        // println!("ResultIterator::Error: {}", err);
                         return Some(Err(err));
                     }
                 }
@@ -287,7 +263,7 @@ impl <'iter, 'conn: 'iter, R> Iterator for QueryIterator<'iter,'conn, R> where R
 
         // rows allready fetched, iterate over fetched rows
         if self.rows_fetched > 0 {
-            // println!("QueryIterator::rows_fetched > 0");
+            // println!("ResultIterator::rows_fetched: {}", self.rows_fetched);
             let result = self.processor.get_result(self.cursor_index as isize);
             self.cursor_index += 1;
 
@@ -297,7 +273,7 @@ impl <'iter, 'conn: 'iter, R> Iterator for QueryIterator<'iter,'conn, R> where R
 
             Some(Ok(R::from_resultset(&result)))
         } else {
-            // println!("QueryIterator::rows_fetched == 0");
+            // println!("ResultIterator::rows_fetched == 0");
             None
         }
     }

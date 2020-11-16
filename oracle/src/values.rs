@@ -64,6 +64,20 @@ impl From<&ResultValue> for String {
     }
 }
 
+impl <const PREFETCH: usize> From<&ResultValue> for Varchar<PREFETCH> {
+    fn from(v: &ResultValue) -> Varchar<PREFETCH> {
+        v.map_or(String::new().into(),|valp,len| {
+            let str_len = len as usize;
+            let mut dst = Vec::with_capacity(str_len) as Vec<u8>;
+            unsafe {
+                dst.set_len(str_len);
+                ptr::copy(valp, dst.as_mut_ptr(), str_len);
+                String::from_utf8_unchecked(dst).into()
+            }
+        })
+    }
+}
+
 impl ValueProjector<String> for String {
     fn project_value(&self, projection: &mut ParamValue) {
         projection.project(self, |data, indp| {

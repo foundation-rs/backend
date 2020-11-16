@@ -87,14 +87,14 @@ impl Connection {
     }
 
     /// Prepare query with default 10 prefetch rows
-    pub fn query<P,R>(&self, sql: &str)
+    pub fn query<'conn, P,R: 'conn>(&'conn self, sql: &str)
                     -> OracleResult<statement::Query<P,R,10>>
         where P: ParamsProvider, R: ResultsProvider {
         statement::Statement::new(self, sql)?.query()
     }
 
     /// Prepare query with 1 row
-    pub fn query_one<P,R>(&self, sql: &str)
+    pub fn query_one<'conn, P,R: 'conn>(&'conn self, sql: &str)
                     -> OracleResult<statement::Query<P,R,1>>
         where P: ParamsProvider, R: ResultsProvider {
         statement::Statement::new(self, sql)?.query_one()

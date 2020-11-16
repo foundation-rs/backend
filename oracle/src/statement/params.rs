@@ -61,7 +61,7 @@ impl <'a> ParamValue {
                 },
                 Some(val) => {
                     *self.indp = 0;
-                    self.project(param, f);
+                    self.project(val, f);
                 }
             }
         };
@@ -69,7 +69,7 @@ impl <'a> ParamValue {
 
     /// Convert non-optional type to row data
     #[inline]
-    pub fn project<U, F>(&mut self, param: &U, f: F)
+    pub fn project<U, F>(&mut self, _param: &U, f: F)
                          -> () where F: FnOnce(*mut u8, *mut i16) -> usize {
         unsafe {
             *self.indp = 0;

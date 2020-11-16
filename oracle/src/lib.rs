@@ -12,7 +12,7 @@ mod singulars;
 pub use oci::{OracleError, OracleResult};
 pub use connection::{Connection, connect};
 
-pub use sql_types::{SqlDate, SqlDateTime};
+pub use sql_types::{SqlDate, SqlDateTime, Varchar};
 
 pub use types::{
     DescriptorsProvider,
@@ -23,6 +23,7 @@ pub use types::{
 pub use statement::{
     Statement,
     Query,
+    QueryIterator,
     ResultsProvider,
     ResultSet,
     ParamsProvider,

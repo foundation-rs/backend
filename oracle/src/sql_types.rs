@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use chrono::prelude::*;
 
 // Date and Datetime
@@ -26,28 +25,31 @@ pub type SqlDateTime = DateTime<Local>;
 // SEE: https://www.worthe-it.co.za/blog/2020-10-31-newtype-pattern-in-rust.html
 
 /// String with fixed predefined length
-pub struct Varchar<'a, const PREFETCH: usize> (
-    Cow<'a, str>
+pub struct Varchar<const PREFETCH: usize> (
+    String
 );
 
-impl <'a, const PREFETCH: usize> Varchar<'a, PREFETCH> {
-    pub fn new_owned(s: String) -> Varchar<'a, PREFETCH> {
-        Varchar(Cow::Owned(s))
-    }
-    pub fn new_borrowed(s: &'a str) -> Varchar<'a, PREFETCH> {
-        Varchar(Cow::Borrowed(s))
+impl <const PREFETCH: usize> Varchar<PREFETCH> {
+    pub fn new(s: String) -> Varchar<PREFETCH> {
+        Varchar(s)
     }
     pub fn as_ref(&self) -> &str {
         &self.0.as_ref()
     }
     pub fn into_owned(self) -> String {
-        self.0.into_owned()
+        self.0
+    }
+}
+
+impl <const PREFETCH: usize> From<String> for Varchar<PREFETCH> {
+    fn from(v: String) -> Varchar<PREFETCH> {
+        Varchar::new(v)
     }
 }
 
 use std::ops::Deref;
 
-impl <'a, const PREFETCH: usize> Deref for Varchar<'a, PREFETCH> {
+impl <const PREFETCH: usize> Deref for Varchar<PREFETCH> {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
