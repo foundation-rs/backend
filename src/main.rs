@@ -62,8 +62,8 @@ fn main() -> Result<(), String> {
 
     println!();
     println!("TOTAL:   {} schemas with {} tables & views and {} columns", schemas_count,  tables_count, columns_count);
-    println!("         with primary keys are {} tables", pks_count);
-    println!("         found {} indexes", indexes_count);
+    println!("         {} tables with primary keys", pks_count);
+    println!("         {} indexes found", indexes_count);
 
     let end = chrono::offset::Local::now();
     let duration = end - start;
