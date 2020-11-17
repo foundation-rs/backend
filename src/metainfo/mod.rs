@@ -40,10 +40,7 @@ impl MetaInfo {
             .group_by(|t| t.owner.clone() );
 
         // join tables and columns grouped iterators
-        let joined = grouped_tables.into_iter().zip(grouped_columns.into_iter()).map(|entry| {
-            let tables = entry.0;
-            let columns = entry.1;
-
+        let joined = grouped_tables.into_iter().zip(grouped_columns.into_iter()).map(|(tables,columns)| {
             // name of schema in tables and columns iterators must same
             assert_eq!(tables.0, columns.0);
             (tables.0, tables.1, columns.1)
@@ -55,10 +52,7 @@ impl MetaInfo {
             // group columns iterator by table name
             let grouped_columns = columns.group_by(|t|t.table_name.clone());
             // join tables and columns iterators
-            let joined = tables.zip(grouped_columns.into_iter()).map(|entry| {
-                let table = entry.0;
-                let columns = entry.1;
-
+            let joined = tables.zip(grouped_columns.into_iter()).map(|(table,columns)| {
                 // name of table in tables and columns iterator must same
                 assert_eq!(table.table_name, columns.0);
                 (table, columns.1)
