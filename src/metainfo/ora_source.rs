@@ -98,7 +98,7 @@ pub fn fetch_indexes<'iter, 'conn: 'iter>(conn: &'conn oracle::Connection, exclu
         "SELECT C.TABLE_OWNER, C.TABLE_NAME, C.INDEX_NAME, C.UNIQUENESS, CC.COLUMN_NAME, CC.DESCEND \
         FROM SYS.ALL_INDEXES C \
         JOIN SYS.ALL_IND_COLUMNS CC ON C.TABLE_OWNER = CC.INDEX_OWNER AND C.INDEX_NAME = CC.INDEX_NAME
-        WHERE C.OWNER NOT IN ( {} ) AND C.STATUS = 'ENABLED'
+        WHERE C.OWNER NOT IN ( {} ) AND C.STATUS = 'VALID'
         ORDER BY C.TABLE_OWNER, C.TABLE_NAME, C.INDEX_NAME, CC.COLUMN_POSITION"
         ,excludes
     );
