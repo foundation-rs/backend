@@ -97,7 +97,7 @@ impl Connection {
     pub fn query_one<'conn, P,R: 'conn>(&'conn self, sql: &str)
                     -> OracleResult<statement::Query<P,R,1>>
         where P: ParamsProvider, R: ResultsProvider {
-        statement::Statement::new(self, sql)?.query_one()
+        statement::Statement::new(self, sql)?.query()
     }
 
 }

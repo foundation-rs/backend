@@ -48,18 +48,8 @@ impl <'conn,P> Statement<'conn,P> where P: ParamsProvider {
         Ok( Statement { conn, stmthp, params, _params: PhantomData } )
     }
 
-    /// Prepare oracle statement with default prefetch 10 rows
-    pub fn query<R: 'conn +  ResultsProvider>(self) -> OracleResult<Query<'conn,P, R, 10>> {
-        Query::new(self)
-    }
-
-    /// Prepare oracle statement with default prefetch 1 row
-    pub fn query_one<R: 'conn +  ResultsProvider>(self) -> OracleResult<Query<'conn,P,R,1>> {
-        Query::new(self)
-    }
-
     /// Prepare oracle statement with custom prefetch rows
-    pub fn query_many<R: 'conn +  ResultsProvider, const PREFETCH: usize>(self) -> OracleResult<Query<'conn,P,R,PREFETCH>> {
+    pub fn query<R: 'conn +  ResultsProvider, const PREFETCH: usize>(self) -> OracleResult<Query<'conn,P,R,PREFETCH>> {
         assert!(PREFETCH == 20 || PREFETCH == 50 || PREFETCH == 100 || PREFETCH == 200 || PREFETCH == 500 || PREFETCH == 1000 || PREFETCH == 5000 || PREFETCH == 10000);
         Query::new(self)
     }

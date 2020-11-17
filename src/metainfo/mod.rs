@@ -1,6 +1,5 @@
+mod ora_source;
 mod types;
-mod iterate_columns;
-mod iterate_tables;
 
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -10,8 +9,7 @@ use crate::utils;
 
 pub use types::*;
 
-use iterate_columns::*;
-use iterate_tables::*;
+use ora_source::*;
 
 impl MetaInfo {
     pub fn new(conn: &oracle::Connection, excludes: &Vec<String>) -> oracle::OracleResult<MetaInfo> {
@@ -22,186 +20,73 @@ impl MetaInfo {
         Ok( MetaInfo { schemas })
     }
 
-    fn load(conn: &oracle::Connection, excludes: &str)-> oracle::OracleResult<HashMap<Rc<String>,SchemaInfo>> {
-        let tables_iterator = fetch_tables(conn, excludes)?;
-        let mut columns_iterator = fetch_columns(conn, excludes)?;
-
+    pub fn load(conn: &oracle::Connection, excludes: &str)-> oracle::OracleResult<HashMap<Rc<String>,SchemaInfo>> {
         // tables and columns queries/iterators are sorted by owner, table_name and synchronized
+        use itertools::Itertools;
 
-        let mut result = HashMap::with_capacity(5000);
+        let tables_iterator = fetch_tables(conn, excludes)?;
+        let columns_iterator = fetch_columns(conn, excludes)?;
 
-        let mut current_schema = None;
-        let mut previous_column: Option<OraTableColumn> = None;
+        // group tables and columns iterators by schema name
+        // TODO: log errors in ecah result (see: filter_map)
 
-        for v in tables_iterator {
-            // println!("first fetch");
+        let grouped_tables = tables_iterator
+            .filter_map(|r|r.ok())
+            .group_by(|t| t.owner.clone() );
 
-            if let Ok(v) = v {
-                let ref owner = v.owner;
-                let table_name = v.table_name.clone();
-                let num_rows = v.num_rows;
+        let grouped_columns = columns_iterator
+            .filter_map(|r|r.ok())
+            .group_by(|t| t.owner.clone() );
 
-                let is_view = v.table_type == "VIEW";
-                let temporary = v.temporary == "Y";
+        // join tables and columns grouped iterators
+        let joined = grouped_tables.into_iter().zip(grouped_columns.into_iter()).map(|entry| {
+            let tables = entry.0;
+            let columns = entry.1;
 
-                // println!("{}.{}; {:?}; rows: {}", owner, &table_name, &v.table_type, &num_rows);
+            // name of schema in tables and columns iterators must same
+            assert_eq!(tables.0, columns.0);
+            (tables.0, tables.1, columns.1)
+        });
 
-                // iterate over columns_iterator and construct vector for current table
-                let mut columns = Vec::with_capacity(100);
+        let mut result = HashMap::with_capacity(100);
 
-                if let Some(c) = previous_column.take() {
-                    columns.push(c.into());
-                };
+        for (schema, tables, columns) in joined {
+            // group columns iterator by table name
+            let grouped_columns = columns.group_by(|t|t.table_name.clone());
+            // join tables and columns iterators
+            let joined = tables.zip(grouped_columns.into_iter()).map(|entry| {
+                let table = entry.0;
+                let columns = entry.1;
 
-                for c in &mut columns_iterator {
-                    if let Ok(c) = c {
-                        let ref c_owner = c.owner;
-                        let ref c_table_name = c.table_name;
+                // name of table in tables and columns iterator must same
+                assert_eq!(table.table_name, columns.0);
+                (table, columns.1)
+            });
 
-                        // print!("     {}::{}.{} {}({})", c_owner, c_table_name, &c.column_name, &c.data_type, c.data_length);
-    
-                        if c_owner == owner && c_table_name == &table_name {
-                            // println!("   push");
-                            columns.push(c.into());
-                        } else {
-                            // transfer column to next iteration
-                            // println!("   transfer...");
-                            previous_column = Some(c);
-                            break;
-                        }
-                    }
-                }
+            let mut tables = HashMap::with_capacity(200);
 
-                let (schema,old_schema) = 
-                    utils::get_or_insert_with_condition(
-                        &mut current_schema, 
-                        || SchemaInfo { name: Rc::new(v.owner.clone()), tables: HashMap::with_capacity(100) }, 
-                        |s| s.name.as_ref() == &v.owner);
+            for (table,columns) in joined {
+                // construct table info and push it to tables map
+                let name = Rc::new(table.table_name);
+                let num_rows = table.num_rows;
 
-                if let Some(old_schema) = old_schema {
-                    result.insert(old_schema.name.clone(), old_schema);
-                };
-               
-                let table_name = Rc::new(table_name);
-                schema.tables.insert(table_name.clone(), TableInfo { name: table_name, is_view, temporary, num_rows, columns, primary_key: None, indexes: Vec::new() });
-                
-                // let schema = result.entry(v.owner).or_insert_with(|| Schema { tables: HashMap::with_capacity(100) });
-                // schema.tables.entry(table_name.clone()).or_insert(TableInfo { name: table_name, is_view, temporary, num_rows, columns, primary_key: None, indexes: Vec::new() });
-            };
-        }        
-        
-        // println!("after fetch");
-    
-        Ok(result)
-    }
+                let is_view = table.table_type == "VIEW";
+                let temporary = table.temporary == "Y";
 
-    
-    /*
-    fn load(conn: &oracle::Connection, excludes: &Vec<String>) -> oracle::OracleResult<Vec<OraTable>> {
-        let quoted_excludes: Vec<String> = excludes.iter().map(|s| format!("'{}'", s) ).collect();
-        let sql = format!(
-            "SELECT OWNER, TABLE_NAME, NUM_ROWS FROM SYS.ALL_TABLES WHERE OWNER NOT IN ( {} ) ORDER BY OWNER, TABLE_NAME",
-                &quoted_excludes.join(","));
-    
-        let sql_cols =
-            "SELECT COLUMN_ID, OWNER, TABLE_NAME, COLUMN_NAME, DATA_TYPE, DATA_LENGTH, NULLABLE \
-            FROM SYS.ALL_TAB_COLUMNS WHERE OWNER = :own AND TABLE_NAME = :nm";
-    
-        let mut result = Vec::with_capacity(8000);
-    
-        let query = conn
-            .prepare(&sql)?
-            .query_many::<OraTable, 1000>()?;
-    
-        let colmns_query = conn
-            .prepare(&sql_cols)?
-            .query_many::<OraTableColumn, 100>()?;
-    
-        let mut columns_cnt = 0;
-    
-        for v in query.fetch_iter(())? {
-            if let Ok(v) = v {
-                println!("{}.{}; rows: {}", &v.owner, &v.table_name, &v.num_rows);
-                // let params = OraTableColumnParams { own: &v.owner, nm: &v.table_name };
-                let columns = colmns_query.fetch_list((v.owner.as_ref(), v.table_name.as_ref()))?;
-                for c in columns {
-                    let nn = if c.nullable == "Y" { "" } else { "NOT NULL" };
-                    println!("   c {} {}({}) {}", c.column_name, c.data_type, c.data_length, nn);
-                    columns_cnt +=1;
-                }
-                result.push(v);
-            };
-        }
-    
-        println!("total columns: {}", columns_cnt);
-    
-        Ok(result)
-    }
-    */
-}
+                // construct column info and collect it to vector of columns
+                let columns = columns.map(|c|c.into()).collect();
 
-impl From<OraTableColumn> for ColumnInfo {
-    fn from(v: OraTableColumn) -> ColumnInfo {
-        use std::mem::size_of;
-    
-        let name = v.column_name;
-        let nullable = v.nullable == "Y";
-        let data_scale = v.data_scale;
-        let data_precision = v.data_precision;
-        let col_len = v.data_length;
-
-        let mut col_type_name = v.data_type;
-
-        let (col_type, oci_data_type, buffer_len) = {
-            let ctn: &str = &col_type_name.clone();
-            match ctn {
-                "CHAR" | "VARCHAR2" => {
-                    // SQLT_CHR
-                    (ColumnType::Varchar, 1, col_len as usize)
-                },
-                "LONG" => {
-                    // SQLT_CHR
-                    (ColumnType::Long, 1, 4000)
-                },
-                "DATE" => {
-                    // SQLT_DAT
-                    (ColumnType::DateTime, 1, 12)
-                },
-                "CLOB" => {
-                    // SQLT_CLOB
-                    (ColumnType::Clob, 112, 0)
-                },
-                "BLOB" => {
-                    // SQLT_BLOB
-                    (ColumnType::Blob, 113, 0)
-                },
-                "NUMBER" => {
-                    if data_scale == 0 {
-                        if data_precision == 0 || data_precision > 7 {
-                            if data_precision == 0 {
-                                col_type_name = "INTEGER".to_string();
-                            }
-                            // SQLT_NUM
-                            (ColumnType::Int64, 2, size_of::<i64>())
-                        } else if data_precision > 4 {
-                            // SQLT_NUM
-                            (ColumnType::Int32, 2, size_of::<i32>())
-                        } else {
-                            // SQLT_NUM
-                            (ColumnType::Int16, 2, size_of::<i16>())
-                        }
-                    } else {
-                        // SQLT_NUM
-                        (ColumnType::Float64, 2, size_of::<f64>())
-                    }
-                },
-                _ => {
-                    // Unsupported
-                    (ColumnType::Unsupported, 0, 0)
-                }
+                let table = TableInfo { name: name.clone(), is_view, temporary, num_rows, columns, primary_key: None, indexes: Vec::new() };
+                tables.insert(name, table);
             }
+
+            let name = Rc::new(schema);
+            let schema = SchemaInfo { name: name.clone(), tables};
+
+            result.insert(name, schema);
         };
 
-        ColumnInfo { name, col_type, col_type_name, oci_data_type, col_len, nullable, data_precision, data_scale, buffer_len }
+        Ok(result)
     }
+
 }
