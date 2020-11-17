@@ -1,14 +1,14 @@
-mod ora_source;
-mod types;
-
 use std::collections::HashMap;
 use std::rc::Rc;
+use itertools::Itertools;
 
 use oracle;
 use crate::utils;
 
-pub use types::*;
+mod ora_source;
+mod types;
 
+pub use types::*;
 use ora_source::*;
 
 impl MetaInfo {
@@ -16,14 +16,14 @@ impl MetaInfo {
         let quoted_excludes: Vec<String> = excludes.iter().map(|s| format!("'{}'", s) ).collect();
         let joined_excludes = &quoted_excludes.join(",");
 
-        let schemas = MetaInfo::load(conn, &joined_excludes)?;
+        let mut schemas = MetaInfo::load(conn, &joined_excludes)?;
+        MetaInfo::load_primary_keys(conn, &joined_excludes, &mut schemas)?;
+
         Ok( MetaInfo { schemas })
     }
 
-    pub fn load(conn: &oracle::Connection, excludes: &str)-> oracle::OracleResult<HashMap<Rc<String>,SchemaInfo>> {
+    pub fn load(conn: &oracle::Connection, excludes: &str) -> oracle::OracleResult<HashMap<Rc<String>,SchemaInfo>> {
         // tables and columns queries/iterators are sorted by owner, table_name and synchronized
-        use itertools::Itertools;
-
         let tables_iterator = fetch_tables(conn, excludes)?;
         let columns_iterator = fetch_columns(conn, excludes)?;
 
@@ -87,6 +87,35 @@ impl MetaInfo {
         };
 
         Ok(result)
+    }
+
+    pub fn load_primary_keys(conn: &oracle::Connection, excludes: &str, schemas: &mut HashMap<Rc<String>,SchemaInfo>) -> oracle::OracleResult<()> {
+        let pk_iterator = fetch_primary_keys(conn, excludes)?;
+
+        // group primary keys by schema
+        let grouped_keys = pk_iterator
+            .filter_map(|r|r.ok())
+            .group_by(|t| t.owner.clone() );
+
+        for (schema, keys) in grouped_keys.into_iter() {
+            let schema = schemas.get_mut(&schema);
+
+            if let Some(schema) = schema {
+                // group keys by table name and constraint name
+                let grouped_keys = keys
+                    .group_by(|t| (t.table_name.clone(),t.constraint_name.clone()) );
+
+                for ((table_name, name), key_columns) in grouped_keys.into_iter() {
+                    let table_info = schema.tables.get_mut(&table_name);
+                    if let Some(table_info) = table_info {
+                        let columns = key_columns.map(|c|c.column_name).collect();
+                        table_info.primary_key = Some(PrimaryKey { name, columns});
+                    } // table info found
+                }
+            } // schema found
+        };
+
+        Ok(())
     }
 
 }

@@ -25,8 +25,7 @@ fn main() -> Result<(), String> {
     let mut schemas_count = 0;
     let mut tables_count = 0;
     let mut columns_count = 0;
-
-    let mut max_columns_count = 0;
+    let mut pks_count = 0;
 
     for (key,schema) in v.iter() {
         // println!();
@@ -40,16 +39,16 @@ fn main() -> Result<(), String> {
             tables_count += 1;
             columns_count += table.columns.len();
 
-            use std::cmp;
-            max_columns_count = cmp::max(max_columns_count, table.columns.len());
+            if table.primary_key.is_some() {
+                pks_count += 1;
+            }
         }
         schemas_count += 1;
     }
 
     println!();
     println!("TOTAL:   {} schemas with {} tables & views and {} columns", schemas_count,  tables_count, columns_count);
-
-    println!("         maximum count of columns in table: {}", max_columns_count);
+    println!("         with primary keys are {} tables", pks_count);
 
     let end = chrono::offset::Local::now();
     let duration = end - start;

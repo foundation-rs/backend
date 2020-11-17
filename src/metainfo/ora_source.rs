@@ -13,7 +13,7 @@ pub struct OraTable {
     pub temporary:  String,
 }
 
-pub type OraTablesIterator<'iter, 'conn> = QueryIterator<'iter, 'conn, (), OraTable, 5000>;
+pub type TablesIterator<'iter, 'conn> = QueryIterator<'iter, 'conn, (), OraTable, 5000>;
 
 #[derive(ResultsProvider)]
 pub struct OraTableColumn {
@@ -27,9 +27,19 @@ pub struct OraTableColumn {
     pub nullable:       String
 }
 
-pub type OraColumnsIterator<'iter, 'conn> = QueryIterator<'iter, 'conn, (), OraTableColumn, 10000>;
+pub type ColumnsIterator<'iter, 'conn> = QueryIterator<'iter, 'conn, (), OraTableColumn, 10000>;
 
-pub fn fetch_tables<'iter, 'conn: 'iter>(conn: &'conn oracle::Connection, excludes: &str) -> oracle::OracleResult<OraTablesIterator<'iter, 'conn>> {
+#[derive(ResultsProvider)]
+pub struct OraTablePrimaryKeyColumn {
+    pub owner:           String,
+    pub table_name:      String,
+    pub constraint_name: String,
+    pub column_name:     String
+}
+
+pub type PrimaryKeyColumnsIterator<'iter, 'conn> = QueryIterator<'iter, 'conn, (), OraTablePrimaryKeyColumn, 5000>;
+
+pub fn fetch_tables<'iter, 'conn: 'iter>(conn: &'conn oracle::Connection, excludes: &str) -> oracle::OracleResult<TablesIterator<'iter, 'conn>> {
     let sql = format!(
         "SELECT OWNER, TABLE_NAME, TABLE_TYPE, NUM_ROWS, TEMPORARY FROM (
         SELECT OWNER, TABLE_NAME, 'TABLE' AS TABLE_TYPE, NUM_ROWS, TEMPORARY
@@ -38,16 +48,34 @@ pub fn fetch_tables<'iter, 'conn: 'iter>(conn: &'conn oracle::Connection, exclud
         SELECT OWNER, VIEW_NAME, 'VIEW' AS TABLE_TYPE, 0, 'N'
         FROM SYS.ALL_VIEWS
         ) WHERE OWNER NOT IN ( {} )
-        ORDER BY OWNER, TABLE_NAME", excludes);
+        ORDER BY OWNER, TABLE_NAME"
+        ,excludes
+    );
 
     let query = conn.prepare(&sql)?.query()?;
     query.fetch_iter(())
 }
 
-pub fn fetch_columns<'iter, 'conn: 'iter>(conn: &'conn oracle::Connection, excludes: &str) -> oracle::OracleResult<OraColumnsIterator<'iter, 'conn>> {
+pub fn fetch_columns<'iter, 'conn: 'iter>(conn: &'conn oracle::Connection, excludes: &str) -> oracle::OracleResult<ColumnsIterator<'iter, 'conn>> {
     let sql = format!(
         "SELECT OWNER, TABLE_NAME, COLUMN_NAME, DATA_TYPE, DATA_LENGTH, DATA_PRECISION, DATA_SCALE, NULLABLE \
-        FROM SYS.ALL_TAB_COLUMNS WHERE OWNER NOT IN ( {} ) ORDER BY OWNER, TABLE_NAME, COLUMN_ID", excludes);
+        FROM SYS.ALL_TAB_COLUMNS WHERE OWNER NOT IN ( {} ) ORDER BY OWNER, TABLE_NAME, COLUMN_ID"
+        ,excludes
+    );
+
+    let query = conn.prepare(&sql)?.query()?;
+    query.fetch_iter(())
+}
+
+pub fn fetch_primary_keys<'iter, 'conn: 'iter>(conn: &'conn oracle::Connection, excludes: &str) -> oracle::OracleResult<PrimaryKeyColumnsIterator<'iter, 'conn>> {
+    let sql = format!(
+        "SELECT C.OWNER, C.TABLE_NAME, C.CONSTRAINT_NAME, CC.COLUMN_NAME \
+        FROM SYS.ALL_CONSTRAINTS C \
+        JOIN SYS.ALL_CONS_COLUMNS CC ON C.OWNER = CC.OWNER AND C.TABLE_NAME = CC.TABLE_NAME AND C.CONSTRAINT_NAME = CC.CONSTRAINT_NAME
+        WHERE C.OWNER NOT IN ( {} ) AND C.CONSTRAINT_TYPE = 'P' AND C.STATUS = 'ENABLED'
+        ORDER BY C.OWNER, C.TABLE_NAME, C.CONSTRAINT_NAME, CC.POSITION"
+        ,excludes
+    );
 
     let query = conn.prepare(&sql)?.query()?;
     query.fetch_iter(())
