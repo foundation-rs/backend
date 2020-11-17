@@ -1,6 +1,8 @@
 #![feature(min_const_generics)]
 #![feature(option_insert)]
 
+use std::env;
+
 mod config;
 mod utils;
 mod metainfo;
@@ -13,7 +15,16 @@ fn main() -> Result<(), String> {
     let ref conf = config::load("config.xml")?;
     let ref cc = conf.connection;
 
-    let conn = oracle::connect(&cc.url, &cc.user, &cc.pw)
+    let url = &cc.url;
+    let user = &cc.user;
+    let mut pw = cc.pw.clone();
+
+    if (&cc.pw).starts_with("env:") {
+        let key = &cc.pw[4..];
+        pw = env::var(key).unwrap_or(pw);
+    };
+
+    let conn = oracle::connect(url, user, &pw)
         .map_err(|err| format!("Can not connect to Oracle: {}", err))?;
 
     let mi = metainfo::MetaInfo::new(&conn, &conf.excludes.schemes)
@@ -26,6 +37,7 @@ fn main() -> Result<(), String> {
     let mut tables_count = 0;
     let mut columns_count = 0;
     let mut pks_count = 0;
+    let mut indexes_count = 0;
 
     for (key,schema) in v.iter() {
         // println!();
@@ -42,6 +54,8 @@ fn main() -> Result<(), String> {
             if table.primary_key.is_some() {
                 pks_count += 1;
             }
+
+            indexes_count += table.indexes.len();
         }
         schemas_count += 1;
     }
@@ -49,6 +63,7 @@ fn main() -> Result<(), String> {
     println!();
     println!("TOTAL:   {} schemas with {} tables & views and {} columns", schemas_count,  tables_count, columns_count);
     println!("         with primary keys are {} tables", pks_count);
+    println!("         found {} indexes", indexes_count);
 
     let end = chrono::offset::Local::now();
     let duration = end - start;

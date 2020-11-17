@@ -39,6 +39,18 @@ pub struct OraTablePrimaryKeyColumn {
 
 pub type PrimaryKeyColumnsIterator<'iter, 'conn> = QueryIterator<'iter, 'conn, (), OraTablePrimaryKeyColumn, 5000>;
 
+#[derive(ResultsProvider)]
+pub struct OraTableIndexColumn {
+    pub owner:       String,
+    pub table_name:  String,
+    pub index_name:  String,
+    pub uniqueness:  String,
+    pub column_name: String,
+    pub descend:     String
+}
+
+pub type IndexColumnsIterator<'iter, 'conn> = QueryIterator<'iter, 'conn, (), OraTableIndexColumn, 5000>;
+
 pub fn fetch_tables<'iter, 'conn: 'iter>(conn: &'conn oracle::Connection, excludes: &str) -> oracle::OracleResult<TablesIterator<'iter, 'conn>> {
     let sql = format!(
         "SELECT OWNER, TABLE_NAME, TABLE_TYPE, NUM_ROWS, TEMPORARY FROM (
@@ -74,6 +86,20 @@ pub fn fetch_primary_keys<'iter, 'conn: 'iter>(conn: &'conn oracle::Connection, 
         JOIN SYS.ALL_CONS_COLUMNS CC ON C.OWNER = CC.OWNER AND C.TABLE_NAME = CC.TABLE_NAME AND C.CONSTRAINT_NAME = CC.CONSTRAINT_NAME
         WHERE C.OWNER NOT IN ( {} ) AND C.CONSTRAINT_TYPE = 'P' AND C.STATUS = 'ENABLED'
         ORDER BY C.OWNER, C.TABLE_NAME, C.CONSTRAINT_NAME, CC.POSITION"
+        ,excludes
+    );
+
+    let query = conn.prepare(&sql)?.query()?;
+    query.fetch_iter(())
+}
+
+pub fn fetch_indexes<'iter, 'conn: 'iter>(conn: &'conn oracle::Connection, excludes: &str) -> oracle::OracleResult<IndexColumnsIterator<'iter, 'conn>> {
+    let sql = format!(
+        "SELECT C.TABLE_OWNER, C.TABLE_NAME, C.INDEX_NAME, C.UNIQUENESS, CC.COLUMN_NAME, CC.DESCEND \
+        FROM SYS.ALL_INDEXES C \
+        JOIN SYS.ALL_IND_COLUMNS CC ON C.TABLE_OWNER = CC.INDEX_OWNER AND C.INDEX_NAME = CC.INDEX_NAME
+        WHERE C.OWNER NOT IN ( {} ) AND C.STATUS = 'ENABLED'
+        ORDER BY C.TABLE_OWNER, C.TABLE_NAME, C.INDEX_NAME, CC.COLUMN_POSITION"
         ,excludes
     );
 

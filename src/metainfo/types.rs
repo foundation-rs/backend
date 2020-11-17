@@ -19,7 +19,7 @@ pub struct TableInfo {
     pub num_rows:    i32,
     pub columns:     Vec<ColumnInfo>,
     pub primary_key: Option<PrimaryKey>,
-    pub indexes:     Vec<Index>
+    pub indexes:     Vec<TableIndex>
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -44,7 +44,7 @@ pub struct PrimaryKey {
     pub columns: Vec<String>
 }
 
-pub struct Index {
+pub struct TableIndex {
     pub name:    String,
     pub unique:  bool,
     pub columns: Vec<IndexColumn>

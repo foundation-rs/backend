@@ -18,6 +18,7 @@ impl MetaInfo {
 
         let mut schemas = MetaInfo::load(conn, &joined_excludes)?;
         MetaInfo::load_primary_keys(conn, &joined_excludes, &mut schemas)?;
+        MetaInfo::load_indexes(conn, &joined_excludes, &mut schemas)?;
 
         Ok( MetaInfo { schemas })
     }
@@ -110,6 +111,40 @@ impl MetaInfo {
                     if let Some(table_info) = table_info {
                         let columns = key_columns.map(|c|c.column_name).collect();
                         table_info.primary_key = Some(PrimaryKey { name, columns});
+                    } // table info found
+                }
+            } // schema found
+        };
+
+        Ok(())
+    }
+
+    pub fn load_indexes(conn: &oracle::Connection, excludes: &str, schemas: &mut HashMap<Rc<String>,SchemaInfo>) -> oracle::OracleResult<()> {
+        let idx_iterator = fetch_indexes(conn, excludes)?;
+
+        // group indexes by schema
+        let grouped_indexes = idx_iterator
+            .filter_map(|r|r.ok())
+            .group_by(|t| t.owner.clone() );
+
+        for (schema, indexes) in grouped_indexes.into_iter() {
+            let schema = schemas.get_mut(&schema);
+
+            if let Some(schema) = schema {
+                // group indexes by table name and index name
+                let grouped_indexes = indexes
+                    .group_by(|t| t.table_name.clone() );
+
+                for (table_name, indexes) in grouped_indexes.into_iter() {
+                    let table_info = schema.tables.get_mut(&table_name);
+                    if let Some(table_info) = table_info {
+                        let indexes = indexes.group_by(|t|(t.index_name.clone(), t.uniqueness.clone()));
+
+                        for ((index_name, uniqueness), columns) in indexes.into_iter() {
+                            let columns = columns.map(|c| IndexColumn{name: c.column_name, desc: c.descend != "ACC"}).collect();
+                            let index = TableIndex {name: index_name, unique: uniqueness == "UNIQUE", columns};
+                            table_info.indexes.push(index);
+                        }
                     } // table info found
                 }
             } // schema found
