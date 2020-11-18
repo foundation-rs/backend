@@ -5,6 +5,7 @@ use quote::{quote, quote_spanned};
 use crate::internals::Ctxt;
 use crate::internals::ast::Container;
 use std::convert::TryFrom;
+use crate::utils::{extract_path, extract_column_size};
 
 /// Expands #[derive(Params)] macro.
 pub fn expand_derive_params(input: &syn::DeriveInput) -> Result<TokenStream, Vec<syn::Error>> {
@@ -107,7 +108,13 @@ fn generate_members(cont: &Container) -> TokenStream {
         let producer = if convert_to_string {
             quote_spanned! { ty.span() => String::produce() }
         } else {
-            quote_spanned! { ty.span() => #ty::produce() }
+            match extract_column_size(f) {
+                Some(size) => {
+                    let size_literal = Literal::usize_unsuffixed(size);
+                    quote_spanned! { f.original.span() => #ty::produce_sized(#size_literal) }
+                },
+                None => quote_spanned! { f.original.span() => #ty::produce() }
+            }
         };
 
         let ident = match &f.member {
@@ -127,20 +134,3 @@ fn generate_members(cont: &Container) -> TokenStream {
         vec![ #(#expressions),* ]
     }
 }
-
-fn extract_path(ty: &syn::Type) -> Option<&syn::TypePath> {
-    if let syn::Type::Path(x) = ty {
-        Some(x)
-    } else {
-        None
-    }
-}
-
-fn extract_reference(ty: &syn::Type) -> Option<&syn::TypeReference> {
-    if let syn::Type::Reference(x) = ty {
-        Some(x)
-    } else {
-        None
-    }
-}
-

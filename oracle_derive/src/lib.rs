@@ -12,6 +12,7 @@ use quote::quote;
 mod internals;
 mod query;
 mod params;
+mod utils;
 
 /// Generate Query implementation in form of #[derive(Query)]
 /// example:
@@ -37,7 +38,7 @@ mod params;
 //     }
 // }
 ///
-#[proc_macro_derive(ResultsProvider)]
+#[proc_macro_derive(ResultsProvider, attributes(col_size))]
 pub fn derive_query(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
@@ -99,7 +100,7 @@ pub fn derive_query(input: TokenStream) -> TokenStream {
 //        }
 //    }
 //}
-#[proc_macro_derive(ParamsProvider)]
+#[proc_macro_derive(ParamsProvider, attributes(col_size))]
 pub fn derive_params(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 

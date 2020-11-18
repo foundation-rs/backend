@@ -1,3 +1,5 @@
+#[allow(dead_code)]
+
 /// if optional doesn't have value, then call creator, put new value and return it
 /// if optional does have value, check it with predicate
 /// if predicate return true, return old value

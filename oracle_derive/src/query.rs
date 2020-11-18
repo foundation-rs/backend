@@ -12,6 +12,7 @@ use quote::{quote, quote_spanned};
 
 use crate::internals::Ctxt;
 use crate::internals::ast::Container;
+use crate::utils::extract_column_size;
 
 /// Expands #[derive(Query)] macro.
 pub fn expand_derive_query(input: &syn::DeriveInput) -> Result<TokenStream, Vec<syn::Error>> {
@@ -88,7 +89,13 @@ fn generate_from_values(cont: &Container) -> TokenStream {
 fn generate_descriptors_provider(cont: &Container) -> TokenStream {
     let expressions = cont.data.all_fields().map(|f| {
         let ty = f.ty;
-        quote_spanned! { f.original.span() => #ty::produce() }
+        match extract_column_size(f) {
+            Some(size) => {
+                let size_literal = Literal::usize_unsuffixed(size);
+                quote_spanned! { f.original.span() => #ty::produce_sized(#size_literal) }
+            },
+            None => quote_spanned! { f.original.span() => #ty::produce() }
+        }
     });
     quote! {
         use oracle::TypeDescriptorProducer;

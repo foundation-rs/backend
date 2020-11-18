@@ -8,8 +8,10 @@ use super::types::*;
 pub struct OraTable {
     pub owner:      String,
     pub table_name: String,
+    #[col_size=8]
     pub table_type: String,
     pub num_rows:   i32,
+    #[col_size=2]
     pub temporary:  String,
 }
 
@@ -24,6 +26,7 @@ pub struct OraTableColumn {
     pub data_length:    u16,
     pub data_precision: u16,
     pub data_scale:     u16,
+    #[col_size=2]
     pub nullable:       String
 }
 
@@ -44,8 +47,10 @@ pub struct OraTableIndexColumn {
     pub owner:       String,
     pub table_name:  String,
     pub index_name:  String,
+    #[col_size=10]
     pub uniqueness:  String,
     pub column_name: String,
+    #[col_size=4]
     pub descend:     String
 }
 
