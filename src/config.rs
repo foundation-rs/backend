@@ -9,7 +9,8 @@ use quick_xml::de::from_str;
 #[derive(Deserialize, Debug, PartialEq)]
 pub struct Config {
     pub connection: ConnectionConfig,
-    pub excludes: Excludes,
+    pub excludes:   Excludes,
+    pub http:       Http,
 }
 
 #[derive(Deserialize, Debug, PartialEq)]
@@ -23,6 +24,12 @@ pub struct ConnectionConfig {
 pub struct Excludes {
     #[serde(rename = "schema", default)]
     pub schemas: Vec<String>,
+}
+
+#[derive(Deserialize, Debug, PartialEq)]
+pub struct Http {
+    pub listen: String,
+    pub ssl: String,
 }
 
 pub fn load(filename: &str) -> Result<Config, String> {

@@ -3,6 +3,14 @@
               user="SYSTEM"
               pw="env:SYSTEM_PASSWORD"
   />
+  <http>
+    <listen>
+      127.0.0.1:8081
+    </listen>
+    <ssl>
+      <![CDATA[keystore/sia-app.dev+3.p12]]>
+    </ssl>
+  </http>
   <excludes>
     <schema>APEX_040200</schema>
     <schema>APPQOSSYS</schema>
