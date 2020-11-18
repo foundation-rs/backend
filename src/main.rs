@@ -6,6 +6,7 @@ use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 use std::io::{Error, ErrorKind};
 
 mod config;
+mod datasource;
 mod metainfo;
 mod utils;
 
@@ -16,7 +17,10 @@ async fn main() -> std::io::Result<()> {
     let ref conf = config::load("config.xml")
         .map_err(|e|Error::new(ErrorKind::Other, e))?;
 
-    let mi = metainfo::MetaInfo::load(&conf)
+    datasource::create(&conf.connection)
+        .map_err(|e|Error::new(ErrorKind::Other, e))?;
+
+    let mi = metainfo::MetaInfo::load(&conf.excludes)
         .map_err(|e|Error::new(ErrorKind::Other, e))?;
 
     let server = HttpServer::new(|| {

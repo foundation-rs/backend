@@ -8,12 +8,12 @@ use quick_xml::de::from_str;
 
 #[derive(Deserialize, Debug, PartialEq)]
 pub struct Config {
-    pub connection: Connection,
+    pub connection: ConnectionConfig,
     pub excludes: Excludes,
 }
 
 #[derive(Deserialize, Debug, PartialEq)]
-pub struct Connection {
+pub struct ConnectionConfig {
     pub url: String,
     pub user: String,
     pub pw: String

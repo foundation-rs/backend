@@ -4,34 +4,24 @@ use std::rc::Rc;
 use itertools::Itertools;
 
 use oracle;
-use crate::{utils, config};
+use crate::{utils, config, datasource};
 
 mod ora_source;
 mod types;
 
 pub use types::*;
 use ora_source::*;
-use crate::config::Config;
+use crate::config::{Config, Excludes};
 
 
 impl MetaInfo {
-    pub fn load(config: &Config) -> Result<MetaInfo, String> {
+    pub fn load(excludes: &Excludes) -> Result<MetaInfo, String> {
         println!("READING METAINFO FROM ORACLE...");
-        let ref cc = config.connection;
 
-        let url = &cc.url;
-        let user = &cc.user;
-        let mut pw = cc.pw.clone();
+        let conn = datasource::get_connection()
+            .map_err(|err|format!("Can not connect to oracle: {}", err))?;
 
-        if (&cc.pw).starts_with("env:") {
-            let key = &cc.pw[4..];
-            pw = env::var(key).unwrap_or(pw);
-        };
-
-        let conn = oracle::connect(url, user, &pw)
-            .map_err(|err| format!("Can not connect to Oracle: {}", err))?;
-
-        let schemas = MetaInfo::load_internal(&conn, &config.excludes.schemas)
+        let schemas = MetaInfo::load_internal(&conn, &excludes.schemas)
             .map_err(|err| format!("Can not read metainfo about oracle tables: {}", err))?;
 
         let mut v: Vec<_> = schemas.iter().collect();
