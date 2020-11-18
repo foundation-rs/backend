@@ -21,8 +21,8 @@ pub struct Connection {
 
 #[derive(Deserialize, Debug, PartialEq)]
 pub struct Excludes {
-    #[serde(rename = "scheme", default)]
-    pub schemes: Vec<String>,
+    #[serde(rename = "schema", default)]
+    pub schemas: Vec<String>,
 }
 
 pub fn load(filename: &str) -> Result<Config, String> {

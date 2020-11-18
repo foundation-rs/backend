@@ -1,29 +1,89 @@
 use std::collections::HashMap;
+use std::env;
 use std::rc::Rc;
 use itertools::Itertools;
 
 use oracle;
-use crate::utils;
+use crate::{utils, config};
 
 mod ora_source;
 mod types;
 
 pub use types::*;
 use ora_source::*;
+use crate::config::Config;
+
 
 impl MetaInfo {
-    pub fn new(conn: &oracle::Connection, excludes: &Vec<String>) -> oracle::OracleResult<MetaInfo> {
-        let quoted_excludes: Vec<String> = excludes.iter().map(|s| format!("'{}'", s) ).collect();
-        let joined_excludes = &quoted_excludes.join(",");
+    pub fn load(config: &Config) -> Result<MetaInfo, String> {
+        println!("READING METAINFO FROM ORACLE...");
+        let ref cc = config.connection;
 
-        let mut schemas = MetaInfo::load(conn, &joined_excludes)?;
-        MetaInfo::load_primary_keys(conn, &joined_excludes, &mut schemas)?;
-        MetaInfo::load_indexes(conn, &joined_excludes, &mut schemas)?;
+        let url = &cc.url;
+        let user = &cc.user;
+        let mut pw = cc.pw.clone();
+
+        if (&cc.pw).starts_with("env:") {
+            let key = &cc.pw[4..];
+            pw = env::var(key).unwrap_or(pw);
+        };
+
+        let conn = oracle::connect(url, user, &pw)
+            .map_err(|err| format!("Can not connect to Oracle: {}", err))?;
+
+        let schemas = MetaInfo::load_internal(&conn, &config.excludes.schemas)
+            .map_err(|err| format!("Can not read metainfo about oracle tables: {}", err))?;
+
+        let mut v: Vec<_> = schemas.iter().collect();
+        v.sort_by(|x,y| x.0.as_ref().cmp(&y.0.as_ref()));
+
+        let mut schemas_count = 0;
+        let mut tables_count = 0;
+        let mut columns_count = 0;
+        let mut pks_count = 0;
+        let mut indexes_count = 0;
+
+        for (key,schema) in v.iter() {
+            // println!();
+            // println!("[{}]", key.as_ref());
+
+            let mut v: Vec<_> = schema.tables.iter().collect();
+            v.sort_by(|x,y| x.0.as_ref().cmp(&y.0.as_ref()));
+
+            for (key,table) in v {
+                // println!("{}; rows: {}", key.as_ref(), table.num_rows);
+                tables_count += 1;
+                columns_count += table.columns.len();
+
+                if table.primary_key.is_some() {
+                    pks_count += 1;
+                }
+
+                indexes_count += table.indexes.len();
+            }
+            schemas_count += 1;
+        }
+
+        println!();
+        println!("TOTAL:   {} schemas with {} tables & views and {} columns", schemas_count,  tables_count, columns_count);
+        println!("         {} tables with primary keys", pks_count);
+        println!("         {} indexes found", indexes_count);
 
         Ok( MetaInfo { schemas })
     }
 
-    pub fn load(conn: &oracle::Connection, excludes: &str) -> oracle::OracleResult<HashMap<Rc<String>,SchemaInfo>> {
+    fn load_internal(conn: &oracle::Connection, excludes: &Vec<String>) -> oracle::OracleResult<HashMap<Rc<String>,SchemaInfo>> {
+        let quoted_excludes: Vec<String> = excludes.iter().map(|s| format!("'{}'", s) ).collect();
+        let joined_excludes = &quoted_excludes.join(",");
+
+        let mut schemas = MetaInfo::load_tables(&conn, &joined_excludes)?;
+        MetaInfo::load_primary_keys(&conn, &joined_excludes, &mut schemas)?;
+        MetaInfo::load_indexes(&conn, &joined_excludes, &mut schemas)?;
+
+        Ok(schemas)
+    }
+
+    fn load_tables(conn: &oracle::Connection, excludes: &str) -> oracle::OracleResult<HashMap<Rc<String>,SchemaInfo>> {
         // tables and columns queries/iterators are sorted by owner, table_name and synchronized
         let tables_iterator = fetch_tables(conn, excludes)?;
         let columns_iterator = fetch_columns(conn, excludes)?;
@@ -84,7 +144,7 @@ impl MetaInfo {
         Ok(result)
     }
 
-    pub fn load_primary_keys(conn: &oracle::Connection, excludes: &str, schemas: &mut HashMap<Rc<String>,SchemaInfo>) -> oracle::OracleResult<()> {
+    fn load_primary_keys(conn: &oracle::Connection, excludes: &str, schemas: &mut HashMap<Rc<String>,SchemaInfo>) -> oracle::OracleResult<()> {
         let pk_iterator = fetch_primary_keys(conn, excludes)?;
 
         // group primary keys by schema
@@ -113,7 +173,7 @@ impl MetaInfo {
         Ok(())
     }
 
-    pub fn load_indexes(conn: &oracle::Connection, excludes: &str, schemas: &mut HashMap<Rc<String>,SchemaInfo>) -> oracle::OracleResult<()> {
+    fn load_indexes(conn: &oracle::Connection, excludes: &str, schemas: &mut HashMap<Rc<String>,SchemaInfo>) -> oracle::OracleResult<()> {
         let idx_iterator = fetch_indexes(conn, excludes)?;
 
         // group indexes by schema

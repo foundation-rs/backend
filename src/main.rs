@@ -2,69 +2,34 @@
 #![feature(option_insert)]
 
 use std::env;
+use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
+use std::io::{Error, ErrorKind};
 
 mod config;
-mod utils;
 mod metainfo;
+mod utils;
 
-use oracle;
-
-fn main() -> Result<(), String> {
+#[actix_web::main]
+async fn main() -> std::io::Result<()> {
     let start = chrono::offset::Local::now();
 
-    let ref conf = config::load("config.xml")?;
-    let ref cc = conf.connection;
+    let ref conf = config::load("config.xml")
+        .map_err(|e|Error::new(ErrorKind::Other, e))?;
 
-    let url = &cc.url;
-    let user = &cc.user;
-    let mut pw = cc.pw.clone();
+    let mi = metainfo::MetaInfo::load(&conf)
+        .map_err(|e|Error::new(ErrorKind::Other, e))?;
 
-    if (&cc.pw).starts_with("env:") {
-        let key = &cc.pw[4..];
-        pw = env::var(key).unwrap_or(pw);
-    };
-
-    let conn = oracle::connect(url, user, &pw)
-        .map_err(|err| format!("Can not connect to Oracle: {}", err))?;
-
-    let mi = metainfo::MetaInfo::new(&conn, &conf.excludes.schemes)
-                .map_err(|err| format!("Can not read metainfo about oracle tables: {}", err))?;
-
-    let mut v: Vec<_> = mi.schemas.iter().collect();
-    v.sort_by(|x,y| x.0.as_ref().cmp(&y.0.as_ref()));
-
-    let mut schemas_count = 0;
-    let mut tables_count = 0;
-    let mut columns_count = 0;
-    let mut pks_count = 0;
-    let mut indexes_count = 0;
-
-    for (key,schema) in v.iter() {
-        // println!();
-        // println!("[{}]", key.as_ref());
-
-        let mut v: Vec<_> = schema.tables.iter().collect();
-        v.sort_by(|x,y| x.0.as_ref().cmp(&y.0.as_ref()));
-    
-        for (key,table) in v {
-            // println!("{}; rows: {}", key.as_ref(), table.num_rows);
-            tables_count += 1;
-            columns_count += table.columns.len();
-
-            if table.primary_key.is_some() {
-                pks_count += 1;
-            }
-
-            indexes_count += table.indexes.len();
-        }
-        schemas_count += 1;
-    }
+    let server = HttpServer::new(|| {
+        App::new()
+            .service(hello)
+            .service(echo)
+            .route("/hey", web::get().to(manual_hello))
+    })
+        .bind("127.0.0.1:8081")?
+        .run();
 
     println!();
-    println!("TOTAL:   {} schemas with {} tables & views and {} columns", schemas_count,  tables_count, columns_count);
-    println!("         {} tables with primary keys", pks_count);
-    println!("         {} indexes found", indexes_count);
-
+    println!("SERVER STARTED ON `localhost:8081`");
     let end = chrono::offset::Local::now();
     let duration = end - start;
 
@@ -73,5 +38,20 @@ fn main() -> Result<(), String> {
     println!();
     println!("ELAPSED: {} seconds, {} milliseconds", seconds, milliseconds);
 
-    Ok(())
+    // info!(log, "Server Started on localhost:8081");
+    server.await
+}
+
+#[get("/")]
+async fn hello() -> impl Responder {
+    HttpResponse::Ok().body("Hello world!")
+}
+
+#[post("/echo")]
+async fn echo(req_body: String) -> impl Responder {
+    HttpResponse::Ok().body(req_body)
+}
+
+async fn manual_hello() -> impl Responder {
+    HttpResponse::Ok().body("Hey there!")
 }

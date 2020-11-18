@@ -4,21 +4,21 @@
               pw="env:SYSTEM_PASSWORD"
   />
   <excludes>
-    <scheme>APEX_040200</scheme>
-    <scheme>APPQOSSYS</scheme>
-    <scheme>AUDSYS</scheme>
-    <scheme>COPIE</scheme>
-    <scheme>CTXSYS</scheme>
-    <scheme>DBSNMP</scheme>
-    <scheme>GSMADMIN_INTERNAL</scheme>
-    <scheme>FLOWS_FILES</scheme>
-    <scheme>MDSYS</scheme>
-    <scheme>OJVMSYS</scheme>
-    <scheme>ORDDATA</scheme>
-    <scheme>ORDSYS</scheme>
-    <scheme>SYS</scheme>
-    <scheme>SYSTEM</scheme>
-    <scheme>WMSYS</scheme>
-    <scheme>XDB</scheme>
+    <schema>APEX_040200</schema>
+    <schema>APPQOSSYS</schema>
+    <schema>AUDSYS</schema>
+    <schema>COPIE</schema>
+    <schema>CTXSYS</schema>
+    <schema>DBSNMP</schema>
+    <schema>GSMADMIN_INTERNAL</schema>
+    <schema>FLOWS_FILES</schema>
+    <schema>MDSYS</schema>
+    <schema>OJVMSYS</schema>
+    <schema>ORDDATA</schema>
+    <schema>ORDSYS</schema>
+    <schema>SYS</schema>
+    <schema>SYSTEM</schema>
+    <schema>WMSYS</schema>
+    <schema>XDB</schema>
   </excludes>
 </config>
