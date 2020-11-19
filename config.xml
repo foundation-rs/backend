@@ -5,10 +5,12 @@
   />
   <http>
     <listen>
-      127.0.0.1:8081
+      127.0.0.1:8444
     </listen>
     <ssl>
-      <![CDATA[keystore/sia-app.dev+3.p12]]>
+      <path><![CDATA[./keystore]]></path>
+      <keyfile>internal-devel.key</keyfile>
+      <certfile>internal-devel.crt</certfile>
     </ssl>
   </http>
   <excludes>

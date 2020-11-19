@@ -10,14 +10,14 @@ use quick_xml::de::from_str;
 pub struct Config {
     pub connection: ConnectionConfig,
     pub excludes:   Excludes,
-    pub http:       Http,
+    pub http:       HTTP,
 }
 
 #[derive(Deserialize, Debug, PartialEq)]
 pub struct ConnectionConfig {
-    pub url: String,
+    pub url:  String,
     pub user: String,
-    pub pw: String
+    pub pw:   String
 }
 
 #[derive(Deserialize, Debug, PartialEq)]
@@ -27,9 +27,16 @@ pub struct Excludes {
 }
 
 #[derive(Deserialize, Debug, PartialEq)]
-pub struct Http {
+pub struct HTTP {
     pub listen: String,
-    pub ssl: String,
+    pub ssl:    SSL,
+}
+
+#[derive(Deserialize, Debug, PartialEq)]
+pub struct SSL {
+    pub path:     String,
+    pub keyfile:  String,
+    pub certfile: String,
 }
 
 pub fn load(filename: &str) -> Result<Config, String> {
