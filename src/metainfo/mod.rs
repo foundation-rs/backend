@@ -16,6 +16,7 @@ use crate::config::{Config, Excludes};
 
 impl MetaInfo {
     pub fn load(excludes: &Excludes) -> Result<MetaInfo, String> {
+        let start = chrono::offset::Local::now();
         println!("READING METAINFO FROM ORACLE...");
 
         let conn = datasource::get_connection()
@@ -58,6 +59,16 @@ impl MetaInfo {
         println!("TOTAL:   {} schemas with {} tables & views and {} columns", schemas_count,  tables_count, columns_count);
         println!("         {} tables with primary keys", pks_count);
         println!("         {} indexes found", indexes_count);
+
+        let end = chrono::offset::Local::now();
+        let duration = end - start;
+
+        let seconds = duration.num_seconds();
+        let milliseconds = duration.num_milliseconds() - seconds * 1000;
+
+        println!();
+        println!("ELAPSED: {} seconds, {} milliseconds", seconds, milliseconds);
+        println!();
 
         Ok( MetaInfo { schemas })
     }
