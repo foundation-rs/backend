@@ -37,7 +37,7 @@ impl Datasource {
 
 pub fn create(config: &ConnectionConfig) -> Result<(), String> {
     let mut ds = (*DATASOURCE).write()
-        .map_err(|err| format!("Can not get lock for datasource creation"))?;
+        .map_err(|_err| format!("Can not get lock for datasource creation"))?;
 
     if let None = *ds {
         *ds = Some(Datasource::new(config));

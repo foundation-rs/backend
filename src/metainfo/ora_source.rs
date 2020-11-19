@@ -2,8 +2,6 @@ use oracle;
 use oracle::QueryIterator;
 use oracle_derive::ResultsProvider;
 
-use super::types::*;
-
 #[derive(ResultsProvider)]
 pub struct OraTable {
     pub owner:      String,

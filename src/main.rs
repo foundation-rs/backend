@@ -2,13 +2,10 @@
 #![feature(option_insert)]
 
 use std::io::{Error, ErrorKind};
-use std::path::Path;
 
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 use actix_slog::StructuredLogger;
-use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod, SslAcceptorBuilder};
 use slog::info;
-use crate::config::HTTP;
 
 mod config;
 mod datasource;

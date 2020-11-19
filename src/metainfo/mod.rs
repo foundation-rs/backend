@@ -1,18 +1,16 @@
 use std::collections::HashMap;
-use std::env;
 use std::rc::Rc;
 use itertools::Itertools;
 
 use oracle;
-use crate::{utils, config, datasource};
+use crate::datasource;
 
 mod ora_source;
 mod types;
 
 pub use types::*;
 use ora_source::*;
-use crate::config::{Config, Excludes};
-
+use crate::config::Excludes;
 
 impl MetaInfo {
     pub fn load(excludes: &Excludes) -> Result<MetaInfo, String> {
@@ -25,32 +23,21 @@ impl MetaInfo {
         let schemas = MetaInfo::load_internal(&conn, &excludes.schemas)
             .map_err(|err| format!("Can not read metainfo about oracle tables: {}", err))?;
 
-        let mut v: Vec<_> = schemas.iter().collect();
-        v.sort_by(|x,y| x.0.as_ref().cmp(&y.0.as_ref()));
-
         let mut schemas_count = 0;
         let mut tables_count = 0;
         let mut columns_count = 0;
         let mut pks_count = 0;
         let mut indexes_count = 0;
 
-        for (key,schema) in v.iter() {
-            // println!();
-            // println!("[{}]", key.as_ref());
-
-            let mut v: Vec<_> = schema.tables.iter().collect();
-            v.sort_by(|x,y| x.0.as_ref().cmp(&y.0.as_ref()));
-
-            for (key,table) in v {
-                // println!("{}; rows: {}", key.as_ref(), table.num_rows);
+        for (_key,schema) in schemas.iter() {
+            for (_key,table) in schema.tables.iter() {
                 tables_count += 1;
                 columns_count += table.columns.len();
+                indexes_count += table.indexes.len();
 
                 if table.primary_key.is_some() {
                     pks_count += 1;
                 }
-
-                indexes_count += table.indexes.len();
             }
             schemas_count += 1;
         }
