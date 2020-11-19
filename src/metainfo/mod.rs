@@ -14,9 +14,11 @@ use crate::config::Excludes;
 
 impl MetaInfo {
     pub fn load(excludes: &Excludes) -> Result<MetaInfo, String> {
-        let start = chrono::offset::Local::now();
+        std::thread::sleep(std::time::Duration::from_millis(10));
         println!();
         println!("READING METAINFO FROM ORACLE...");
+
+        let start = chrono::offset::Local::now();
 
         let conn = datasource::get_connection()
             .map_err(|err|format!("Can not connect to oracle: {}", err))?;

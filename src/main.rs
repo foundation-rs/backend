@@ -16,7 +16,6 @@ mod utils;
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let log = setup::logging();
-
     info!(log, "Starting Foundation Server");
 
     let ref conf = config::load("config.xml")
