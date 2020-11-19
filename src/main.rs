@@ -17,6 +17,8 @@ mod utils;
 async fn main() -> std::io::Result<()> {
     let log = setup::logging();
 
+    info!(log, "Starting Foundation Server", &http.listen);
+
     let ref conf = config::load("config.xml")
         .map_err(|e|Error::new(ErrorKind::Other, e))?;
 

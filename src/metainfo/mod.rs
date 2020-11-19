@@ -15,6 +15,7 @@ use crate::config::Excludes;
 impl MetaInfo {
     pub fn load(excludes: &Excludes) -> Result<MetaInfo, String> {
         let start = chrono::offset::Local::now();
+        println!();
         println!("READING METAINFO FROM ORACLE...");
 
         let conn = datasource::get_connection()
