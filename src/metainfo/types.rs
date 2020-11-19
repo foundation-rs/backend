@@ -1,19 +1,21 @@
 use std::collections::HashMap;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use super::ora_source::*;
 
+pub type SchemaInfoMap = HashMap<Arc<String>,SchemaInfo>;
+
 pub struct MetaInfo {
-    pub schemas:  HashMap<Rc<String>,SchemaInfo>,
+    pub schemas:  SchemaInfoMap,
 }
 
 pub struct SchemaInfo {
-    pub name:    Rc<String>,
-    pub tables:  HashMap<Rc<String>,TableInfo>,
+    pub name:    Arc<String>,
+    pub tables:  HashMap<Arc<String>,TableInfo>,
 }
 
 pub struct TableInfo {
-    pub name:        Rc<String>,
+    pub name:        Arc<String>,
     pub is_view:     bool,
     pub temporary:   bool,
     pub num_rows:    i32,
