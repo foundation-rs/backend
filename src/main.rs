@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::io::{Error, ErrorKind};
 
-use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder, middleware};
+use actix_web::{middleware, App, HttpServer};
 use actix_web::http::ContentEncoding;
 use actix_slog::StructuredLogger;
 use slog::info;
@@ -37,21 +37,10 @@ async fn main() -> std::io::Result<()> {
             .wrap(StructuredLogger::new(log.clone()))
             .wrap(middleware::Compress::new(ContentEncoding::Br))
 
-            .service(web::scope("/metainfo").configure(application::metainfo_config))
-            .service(hello)
-            .service(health)
+            .service(application::metainfo_scope())
+            .service( application::base_scope())
     })
         .bind_openssl(&http.listen, builder)?
         .run()
         .await
-}
-
-#[get("/")]
-async fn hello() -> impl Responder {
-    HttpResponse::Ok().body("Hello world!")
-}
-
-#[get("/health")]
-async fn health() -> impl Responder {
-    "OK".to_string()
 }

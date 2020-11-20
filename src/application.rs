@@ -1,11 +1,11 @@
 use std::sync::{Arc, RwLock};
 use std::io::{Error, ErrorKind, Result};
 
+use actix_web::{get, web, HttpResponse, Responder, Scope};
 use serde::{Serialize};
 
 use crate::config::Config;
 use crate::metainfo::{self,MetaInfo};
-use actix_web::{get, web, Responder, HttpResponse};
 
 // This struct represents state
 pub struct ApplicationState {
@@ -21,11 +21,28 @@ impl ApplicationState {
     }
 }
 
-// this function could be located in a different module
-pub fn metainfo_config(cfg: &mut web::ServiceConfig) {
-    cfg
+// group of base endpoints
+pub fn base_scope() -> Scope {
+    web::scope("/")
+        .service(hello)
+        .service(health)
+}
+
+#[get("")]
+async fn hello() -> impl Responder {
+    HttpResponse::Ok().body("Hello world!")
+}
+
+#[get("/health")]
+async fn health() -> impl Responder {
+    "OK".to_string()
+}
+
+// group of endpoints for metainfo
+pub fn metainfo_scope() -> Scope {
+    web::scope("/metainfo")
         .service(schemas_metainfo)
-        .service(tables_metainfo);
+        .service(tables_metainfo)
 }
 
 #[derive(Serialize)]
