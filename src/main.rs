@@ -39,9 +39,7 @@ async fn main() -> std::io::Result<()> {
 
             .service(web::scope("/metainfo").configure(application::metainfo_config))
             .service(hello)
-            .service(echo)
             .service(health)
-            .route("/hey", web::get().to(manual_hello))
     })
         .bind_openssl(&http.listen, builder)?
         .run()
@@ -53,17 +51,7 @@ async fn hello() -> impl Responder {
     HttpResponse::Ok().body("Hello world!")
 }
 
-#[post("/echo")]
-async fn echo(req_body: String) -> impl Responder {
-    HttpResponse::Ok().body(req_body)
-}
-
 #[get("/health")]
 async fn health() -> impl Responder {
     "OK".to_string()
 }
-
-async fn manual_hello() -> impl Responder {
-    HttpResponse::Ok().body("Hey there!")
-}
-
