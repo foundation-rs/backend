@@ -13,7 +13,7 @@ pub struct OraTable {
     pub temporary:  String,
 }
 
-pub type TablesIterator<'iter, 'conn> = QueryIterator<'iter, 'conn, (), OraTable, 5000>;
+pub type TablesIterator<'iter, 'conn> = QueryIterator<'iter, 'conn, (), OraTable>;
 
 #[derive(ResultsProvider)]
 pub struct OraTableColumn {
@@ -28,7 +28,7 @@ pub struct OraTableColumn {
     pub nullable:       String
 }
 
-pub type ColumnsIterator<'iter, 'conn> = QueryIterator<'iter, 'conn, (), OraTableColumn, 10000>;
+pub type ColumnsIterator<'iter, 'conn> = QueryIterator<'iter, 'conn, (), OraTableColumn>;
 
 #[derive(ResultsProvider)]
 pub struct OraTablePrimaryKeyColumn {
@@ -38,7 +38,7 @@ pub struct OraTablePrimaryKeyColumn {
     pub column_name:     String
 }
 
-pub type PrimaryKeyColumnsIterator<'iter, 'conn> = QueryIterator<'iter, 'conn, (), OraTablePrimaryKeyColumn, 5000>;
+pub type PrimaryKeyColumnsIterator<'iter, 'conn> = QueryIterator<'iter, 'conn, (), OraTablePrimaryKeyColumn>;
 
 #[derive(ResultsProvider)]
 pub struct OraTableIndexColumn {
@@ -52,7 +52,7 @@ pub struct OraTableIndexColumn {
     pub descend:     String
 }
 
-pub type IndexColumnsIterator<'iter, 'conn> = QueryIterator<'iter, 'conn, (), OraTableIndexColumn, 5000>;
+pub type IndexColumnsIterator<'iter, 'conn> = QueryIterator<'iter, 'conn, (), OraTableIndexColumn>;
 
 pub fn fetch_tables<'iter, 'conn: 'iter>(conn: &'conn oracle::Connection, excludes: &str) -> oracle::OracleResult<TablesIterator<'iter, 'conn>> {
     let sql = format!(
@@ -67,7 +67,7 @@ pub fn fetch_tables<'iter, 'conn: 'iter>(conn: &'conn oracle::Connection, exclud
         ,excludes
     );
 
-    let query = conn.prepare(&sql)?.query()?;
+    let query = conn.prepare(&sql)?.query_many(5000)?;
     query.fetch_iter(())
 }
 
@@ -78,7 +78,7 @@ pub fn fetch_columns<'iter, 'conn: 'iter>(conn: &'conn oracle::Connection, exclu
         ,excludes
     );
 
-    let query = conn.prepare(&sql)?.query()?;
+    let query = conn.prepare(&sql)?.query_many(50000)?;
     query.fetch_iter(())
 }
 
@@ -92,7 +92,7 @@ pub fn fetch_primary_keys<'iter, 'conn: 'iter>(conn: &'conn oracle::Connection, 
         ,excludes
     );
 
-    let query = conn.prepare(&sql)?.query()?;
+    let query = conn.prepare(&sql)?.query_many(1000)?;
     query.fetch_iter(())
 }
 
@@ -106,6 +106,6 @@ pub fn fetch_indexes<'iter, 'conn: 'iter>(conn: &'conn oracle::Connection, exclu
         ,excludes
     );
 
-    let query = conn.prepare(&sql)?.query()?;
+    let query = conn.prepare(&sql)?.query_many(1000)?;
     query.fetch_iter(())
 }

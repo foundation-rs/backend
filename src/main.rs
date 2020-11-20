@@ -1,6 +1,3 @@
-#![feature(min_const_generics)]
-#![feature(option_insert)]
-
 use std::io::{Error, ErrorKind};
 use std::sync::{Arc,Mutex};
 

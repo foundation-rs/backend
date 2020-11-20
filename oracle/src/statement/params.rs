@@ -33,6 +33,8 @@ pub enum Identifier {
 pub type ParamsProjection = Vec<ParamValue>;
 
 /// Trait for automatic processing of sql statement parameters
+/// Use `#[derive(ParamsProvider)]` for automatic implementation.
+// See `oracle_derive::ParamsProvider`
 pub trait ParamsProvider {
     fn members() -> Vec<Member>;
     fn project_values(&self, projecton: &mut ParamsProjection) -> ();

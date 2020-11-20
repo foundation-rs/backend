@@ -1,6 +1,3 @@
-#![feature(box_syntax)]
-#![feature(min_const_generics)]
-
 mod environment;
 mod oci;
 mod connection;
@@ -13,7 +10,7 @@ mod singulars;
 pub use oci::{OracleError, OracleResult};
 pub use connection::{Connection, connect};
 
-pub use sql_types::{SqlDate, SqlDateTime, Varchar};
+pub use sql_types::{SqlDate, SqlDateTime};
 
 pub use types::{
     DescriptorsProvider,
