@@ -28,7 +28,7 @@ async fn main() -> std::io::Result<()> {
 
     let application = Arc::new(application::ApplicationState::load(&conf)? );
 
-    info!(log, "Server Started on {}", &http.listen);
+    info!(log, "Server Started on htps://{}", &http.listen);
 
     HttpServer::new(move || {
         App::new()
@@ -38,6 +38,7 @@ async fn main() -> std::io::Result<()> {
             .service(hello)
             .service(echo)
             .service(health)
+            .service(application::get_metainfo)
             .route("/hey", web::get().to(manual_hello))
     })
         .bind_openssl(&http.listen, builder)?
