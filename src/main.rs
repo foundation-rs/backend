@@ -1,21 +1,16 @@
+use std::sync::Arc;
 use std::io::{Error, ErrorKind};
-use std::sync::{Arc,Mutex};
 
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 use actix_slog::StructuredLogger;
 use slog::info;
-use crate::metainfo::MetaInfo;
 
+mod application;
 mod config;
 mod datasource;
-mod setup;
 mod metainfo;
+mod setup;
 mod utils;
-
-// This struct represents state
-struct ApplicationState {
-    metainfo: Arc<Mutex<MetaInfo>>
-}
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -31,17 +26,13 @@ async fn main() -> std::io::Result<()> {
     datasource::create(&conf.connection)
         .map_err(|e|Error::new(ErrorKind::Other, e))?;
 
-    let metainfo = metainfo::MetaInfo::load(&conf.excludes)
-        .map_err(|e|Error::new(ErrorKind::Other, e))?;
-    let metainfo = Arc::new(Mutex::new(metainfo));
+    let application = Arc::new(application::ApplicationState::load(&conf)? );
 
     info!(log, "Server Started on {}", &http.listen);
 
     HttpServer::new(move || {
         App::new()
-            .data(ApplicationState {
-                metainfo: metainfo.clone(),
-            })
+            .data(application.clone())
             .wrap(StructuredLogger::new(log.clone()))
 
             .service(hello)

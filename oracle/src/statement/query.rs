@@ -20,19 +20,18 @@ use super::results::{
 pub struct Query<'conn,P,R> where P: ParamsProvider, R: ResultsProvider {
     stmt:    Statement<'conn, P>,
     prefetch_rows: usize,
-
-    results: ResultProcessor<'conn, R>
+    results: Box<ResultProcessor<'conn, R>>
 }
 
 pub struct QueryIterator<'iter, 'conn: 'iter, P, R: 'conn> where P: ParamsProvider, R: ResultsProvider {
     stmt:    Statement<'conn, P>,
-    results:  ResultProcessor<'conn, R>,
+    results:  Box<ResultProcessor<'conn, R>>,
     iterator_ptr: *mut ResultIterator<'iter,'conn, R>
 }
 
 impl <'conn,P,R: 'conn> Query<'conn,P,R> where P: ParamsProvider, R: ResultsProvider {
     pub(crate) fn new(stmt: Statement<'conn,P>, prefetch_rows: usize) -> OracleResult<Query<'conn,P,R>> {
-        let results = ResultProcessor::new(stmt.conn, stmt.stmthp, prefetch_rows)?;
+        let results = Box::new( ResultProcessor::new(stmt.conn, stmt.stmthp, prefetch_rows)? );
         Ok( Query { stmt, prefetch_rows, results })
     }
 
