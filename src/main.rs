@@ -28,7 +28,7 @@ async fn main() -> std::io::Result<()> {
 
     let application = Arc::new(application::ApplicationState::load(&conf)? );
 
-    info!(log, "Server Started on htps://{}", &http.listen);
+    info!(log, "Server Started on https://{}", &http.listen);
 
     HttpServer::new(move || {
         App::new()
