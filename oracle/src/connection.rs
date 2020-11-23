@@ -7,6 +7,7 @@ use crate::environment::Environment;
 use crate::{statement, OracleResult, ResultsProvider, ParamsProvider};
 
 /// Connection to Oracle and server context
+/*
 pub struct Connection {
     env: &'static Environment,
     srvhp: *mut oci::OCIServer,
@@ -14,8 +15,57 @@ pub struct Connection {
     pub(crate) errhp: *mut oci::OCIError,
     pub(crate) svchp: *mut oci::OCISvcCtx,
 }
+*/
+
+/// Session pool within Oracle client
+pub struct SessionPool {
+    env: &'static Environment,
+    pub(crate) errhp: *const oci::OCIError,
+    poolhp:           *const oci::OCISPool,
+    poolname: String,
+}
+
+// for multithreading and lazy_static
+unsafe impl Sync for SessionPool {}
+unsafe impl Send for SessionPool {}
+
+/// Pooled Connection to Oracle and server context
+pub struct Connection {
+    env: &'static Environment,
+    pub(crate) errhp: *mut oci::OCIError,
+    pub(crate) svchp: *mut oci::OCISvcCtx,
+}
+
+/// create a session pool
+pub fn create_pool(db: &str, username: &str, passwd: &str) -> OracleResult<SessionPool> {
+    let env = Environment::get()?;
+    let errhp = env.errhp;
+
+    let (poolhp, poolname) = oci::create_session_pool(env.envhp, errhp, 1,2, db, username, passwd)?;
+    Ok(SessionPool{env, errhp, poolhp, poolname })
+}
+
+impl SessionPool {
+    pub fn connect(&self) -> OracleResult<Connection> {
+        let svchp = oci::session_get(self.env.envhp, self.errhp as *mut oci::OCIError, &self.poolname)?;
+        Ok( Connection::new(self.env, self.errhp as *mut oci::OCIError, svchp) )
+    }
+}
+
+impl Drop for SessionPool {
+    fn drop(&mut self) {
+        oci::destroy_session_pool(self.poolhp as *mut oci::OCISPool, self.errhp as *mut oci::OCIError).unwrap();
+    }
+}
+
+impl Drop for Connection {
+    fn drop(&mut self) {
+        oci::session_release(self.svchp, self.errhp);
+    }
+}
 
 /// connect to database
+/*
 pub fn connect(db: &str, username: &str, passwd: &str) -> OracleResult<Connection> {
     let env = Environment::get()?;
     let srvhp = oci::handle_alloc(env.envhp, oci::OCI_HTYPE_SERVER)? as *mut oci::OCIServer;
@@ -53,14 +103,16 @@ pub fn connect(db: &str, username: &str, passwd: &str) -> OracleResult<Connectio
 
     return Ok( Connection::new(env, srvhp, authp, errhp, svchp ) );
 }
+ */
 
 impl Connection {
     fn new(env: &'static Environment,
-           srvhp: *mut oci::OCIServer,
-           authp: *mut oci::OCISession,
+           // srvhp: *mut oci::OCIServer,
+           // authp: *mut oci::OCISession,
            errhp: *mut oci::OCIError,
            svchp: *mut oci::OCISvcCtx) -> Connection {
-        Connection { env, srvhp, authp, errhp, svchp }
+        // Connection { env, srvhp, authp, errhp, svchp }
+        Connection { env, errhp, svchp }
     }
 
     /// commit transaction with NO-WAIT option
@@ -102,6 +154,7 @@ impl Connection {
 
 }
 
+/*
 impl Drop for Connection {
     fn drop(&mut self) {
         oci::session_end(self.svchp, self.env.errhp, self.authp);
@@ -110,6 +163,7 @@ impl Drop for Connection {
         free_server_handlers(self.srvhp, self.svchp);
     }
 }
+*/
 
 fn free_session_handler(authp: *mut oci::OCISession) {
     if !authp.is_null() {

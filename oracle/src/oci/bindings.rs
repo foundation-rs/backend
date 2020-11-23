@@ -56,6 +56,22 @@ pub struct OCISnapshot {
     _unused: [u8; 0],
 }
 
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct OCICPool {
+    _unused: [u8; 0],
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct OCISPool {
+    _unused: [u8; 0],
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct OCIAuthInfo {
+    _unused: [u8; 0],
+}
+
 // OCI functions
 
 extern "C" {
@@ -164,6 +180,80 @@ extern "C" {
         svchp: *mut OCISvcCtx,
         errhp: *mut OCIError,
         usrhp: *mut OCISession,
+        mode: c_uint,
+    ) -> c_int;
+}
+
+extern "C" {
+    pub fn OCIConnectionPoolCreate(
+        envhp: *mut OCIEnv,
+        errhp: *mut OCIError,
+        poolhp: *mut OCICPool,
+        poolName: *mut *mut c_uchar,
+        poolNameLen: *mut c_int,
+        dblink: *const c_uchar,
+        dblinkLen: c_int,
+        connMin: c_uint,
+        connMax: c_uint,
+        connIncr: c_uint,
+        poolUserName: *const c_uchar,
+        poolUserLen: c_int,
+        poolPassword: *const c_uchar,
+        poolPassLen: c_int,
+        mode: c_uint,
+    ) -> c_int;
+}
+extern "C" {
+    pub fn OCIConnectionPoolDestroy(
+        poolhp: *mut OCICPool,
+        errhp: *mut OCIError,
+        mode: c_uint,
+    ) -> c_int;
+}
+extern "C" {
+    pub fn OCISessionPoolCreate(
+        envhp: *mut OCIEnv,
+        errhp: *mut OCIError,
+        spoolhp: *mut OCISPool,
+        poolName: *mut *mut c_uchar,
+        poolNameLen: *mut c_uint,
+        connStr: *const c_uchar,
+        connStrLen: c_uint,
+        sessMin: c_uint,
+        sessMax: c_uint,
+        sessIncr: c_uint,
+        userid: *mut c_uchar,
+        useridLen: c_uint,
+        password: *mut c_uchar,
+        passwordLen: c_uint,
+        mode: c_uint,
+    ) -> c_int;
+}
+extern "C" {
+    pub fn OCISessionPoolDestroy(spoolhp: *mut OCISPool, errhp: *mut OCIError, mode: c_uint) -> c_int;
+}
+extern "C" {
+    pub fn OCISessionGet(
+        envhp: *mut OCIEnv,
+        errhp: *mut OCIError,
+        svchp: *mut *mut OCISvcCtx,
+        authhp: *mut OCIAuthInfo,
+        poolName: *mut c_uchar,
+        poolName_len: c_uint,
+        tagInfo: *const c_uchar,
+        tagInfo_len: c_uint,
+        retTagInfo: *mut *mut c_uchar,
+        retTagInfo_len: *mut c_uint,
+        found: *mut c_int, // boolean,
+        mode: c_uint,
+    ) -> c_int;
+}
+extern "C" {
+    pub fn OCISessionRelease(
+        svchp: *mut OCISvcCtx,
+        errhp: *mut OCIError,
+        tag: *mut c_uchar,
+        tag_len: c_uint,
         mode: c_uint,
     ) -> c_int;
 }

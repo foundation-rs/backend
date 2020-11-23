@@ -17,6 +17,7 @@ pub const OCI_HTYPE_SESSION: u32 = 9;
 pub const OCI_HTYPE_STMT: u32 = 4;
 pub const OCI_HTYPE_BIND: u32 = 5;
 pub const OCI_HTYPE_DEFINE: u32 = 6;
+pub const OCI_HTYPE_SPOOL: u32 = 27;
 
 // ERROR CODES
 pub const OCI_SUCCESS: i32 = 0;
@@ -72,3 +73,15 @@ pub const OCI_FETCH_LAST: u16 = 8;
 pub const OCI_FETCH_PRIOR: u16 = 16;
 pub const OCI_FETCH_ABSOLUTE: u16 = 32;
 pub const OCI_FETCH_RELATIVE: u16 = 64;
+
+// Session pooling
+pub const OCI_LOGON2_SPOOL: u32 = 1;
+pub const OCI_LOGON2_STMTCACHE: u32 = 4;
+pub const OCI_LOGON2_PROXY: u32 = 8;
+pub const OCI_LOGON2_CPOOL: u32 = 512;
+pub const OCI_SPC_REINITIALIZE: u32 = 1;
+pub const OCI_SPC_HOMOGENEOUS: u32 = 2;
+pub const OCI_SPC_STMTCACHE: u32 = 4;
+pub const OCI_SPC_NO_RLB: u32 = 8;
+pub const OCI_SESSGET_SPOOL: u32 = 1;
+pub const OCI_SESSGET_STMTCACHE: u32 = 4;

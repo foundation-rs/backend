@@ -8,9 +8,7 @@ use crate::config::ConnectionConfig;
 use oracle;
 
 pub struct Datasource {
-    url: String,
-    user: String,
-    pw: String
+    pool: oracle::SessionPool,
 }
 
 type DatasourceHandler = RwLock<Option<Datasource>>;
@@ -20,7 +18,7 @@ lazy_static! {
 }
 
 impl Datasource {
-    fn new(config: &ConnectionConfig) -> Datasource {
+    fn new(config: &ConnectionConfig) -> oracle::OracleResult<Datasource> {
         let url = &config.url;
         let user = &config.user;
         let mut pw = config.pw.clone();
@@ -30,7 +28,8 @@ impl Datasource {
             pw = env::var(key).unwrap_or(pw);
         };
 
-        Datasource { url: url.to_string(), user: user.to_string(), pw}
+        let pool = oracle::create_pool(url, user, &pw)?;
+        Ok(Datasource{pool})
     }
 
 }
@@ -40,7 +39,9 @@ pub fn create(config: &ConnectionConfig) -> Result<(), String> {
         .map_err(|_err| format!("Can not get lock for datasource creation"))?;
 
     if let None = *ds {
-        *ds = Some(Datasource::new(config));
+        let datasource = Datasource::new(config)
+            .map_err(|err| format!("Can not create connection pool: {}", err))?;
+        *ds = Some(datasource);
     };
 
     Ok(())
@@ -49,5 +50,6 @@ pub fn create(config: &ConnectionConfig) -> Result<(), String> {
 pub fn get_connection() -> oracle::OracleResult<oracle::Connection> {
     let ds = (*DATASOURCE).read().unwrap();
     let cc = ds.as_ref().unwrap();
-    oracle::connect(&cc.url, &cc.user, &cc.pw)
+    // oracle::connect(&cc.url, &cc.user, &cc.pw)
+    cc.pool.connect()
 }

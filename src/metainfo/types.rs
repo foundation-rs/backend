@@ -1,9 +1,8 @@
+use std::borrow::Borrow;
 use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
 
 use super::ora_source::*;
-use std::borrow::Borrow;
-use std::cell::UnsafeCell;
 
 pub struct MetaInfo {
     pub schemas:  HashSet<SchemaInfo>,

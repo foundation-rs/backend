@@ -18,6 +18,7 @@ pub use bindings::{
     OCIEnv,
     OCIServer,
     OCISession,
+    OCISPool,
     OCISvcCtx,
     OCIStmt,
     c_void
@@ -50,6 +51,10 @@ pub use functions::{
     prepare_auth,
     session_begin,
     session_end,
+    create_session_pool,
+    destroy_session_pool,
+    session_get,
+    session_release,
     commit,
     rollback,
     stmt_prepare,

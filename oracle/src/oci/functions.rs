@@ -8,6 +8,7 @@ use super::error::{
     OracleError
 };
 use crate::OracleResult;
+use std::ptr::{null_mut, null};
 
 /// creates and initializes an environment for the rest of the OCI functions
 #[inline]
@@ -151,6 +152,86 @@ pub fn prepare_auth(envhp: *mut OCIEnv, errhp: *mut OCIError, username: &str, pa
 
     Ok(authp)
 }
+
+/// allocate a session pool handle & create a pool session
+pub fn create_session_pool(envhp: *mut OCIEnv, errhp: *mut OCIError, sess_min: u32, sess_max: u32, db: &str, username: &str, passwd: &str) -> OracleResult<(*mut OCISPool,String)> {
+    let poolhp = handle_alloc(envhp, OCI_HTYPE_SPOOL)? as *mut OCISPool;
+
+    let db_len = db.len() as u32;
+    let db = CString::new(db).unwrap();
+
+    let username_len = username.len() as u32;
+    let username = CString::new(username).unwrap();
+
+    let passwd_len = passwd.len() as u32;
+    let passwd = CString::new(passwd).unwrap();
+
+    let poolname: *mut u8 = null_mut();
+    let mut poolname_len: u32 = 0;
+
+    let result = check_error(
+        unsafe {
+            OCISessionPoolCreate(envhp, errhp, poolhp, &poolname as *const *mut u8 as *mut *mut u8, &mut poolname_len,
+                                 db.as_ptr() as *mut u8, db_len, sess_min, sess_max, 1,
+                                 username.as_ptr() as *mut u8, username_len, passwd.as_ptr() as *mut u8, passwd_len, OCI_SPC_STMTCACHE | OCI_SPC_HOMOGENEOUS)
+        }, Some(errhp), "oci::prepare_session_pool");
+
+    if let Err(err) = result {
+        handle_free(poolhp as *mut c_void, OCI_HTYPE_SPOOL);
+        return Err(err);
+    }
+
+    let poolname = unsafe {
+        let poolname_vec = Vec::from_raw_parts(poolname, poolname_len as usize, poolname_len as usize);
+        String::from_utf8_unchecked(poolname_vec)
+    };
+
+    Ok((poolhp, poolname))
+}
+
+/// Destroy session pool and free it handle
+pub fn destroy_session_pool(poolhp: *mut OCISPool, errhp: *mut OCIError) -> OracleResult<()> {
+    check_error(
+        unsafe {
+            OCISessionPoolDestroy(poolhp, errhp, OCI_DEFAULT)
+        }, Some(errhp), "oci::destroy_session_pool")?;
+    handle_free(poolhp as *mut c_void, OCI_HTYPE_SPOOL);
+    Ok(())
+}
+
+/// creates a user authentication and begins a user session for a given session pool
+#[inline]
+pub fn session_get(envhp: *mut OCIEnv, errhp: *mut OCIError, poolname: &str)
+                     -> OracleResult<*mut OCISvcCtx> {
+    let mut svchp = ptr::null_mut() as *mut OCISvcCtx;
+
+    let authhp = ptr::null_mut();
+    let ret_tag_info = ptr::null_mut();
+    let mut ret_tag_info_len: c_uint = 0;
+    let mut found: c_int = 0;
+
+    let poolname_len = poolname.len() as u32;
+    let poolname = CString::new(poolname).unwrap();
+
+    check_error(
+        unsafe {
+            OCISessionGet(envhp, errhp, &mut svchp, authhp,
+                          poolname.as_ptr() as *const u8 as *mut u8, poolname_len,
+                          null(), 0, ret_tag_info, &mut ret_tag_info_len, &mut found, OCI_SESSGET_SPOOL)
+        }, Some(errhp), "oci::session_get")?;
+
+    Ok(svchp)
+}
+
+/// terminates a user authentication context created by OCISessionBegin()
+#[inline]
+pub fn session_release(svchp: *mut OCISvcCtx, errhp: *mut OCIError) {
+    check_error(
+        unsafe {
+            OCISessionRelease(svchp, errhp, ptr::null_mut(), 0, OCI_DEFAULT)
+        }, Some(errhp), "oci::session_release").unwrap();
+}
+
 
 /// commit transaction in write nowait mode
 #[inline]

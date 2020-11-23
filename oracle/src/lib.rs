@@ -8,7 +8,7 @@ mod statement;
 mod singulars;
 
 pub use oci::{OracleError, OracleResult};
-pub use connection::{Connection, connect};
+pub use connection::{Connection, SessionPool, create_pool};
 
 pub use sql_types::{SqlDate, SqlDateTime};
 
