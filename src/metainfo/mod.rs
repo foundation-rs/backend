@@ -1,5 +1,4 @@
-use std::collections::HashMap;
-use std::sync::Arc;
+use std::collections::HashSet;
 use itertools::Itertools;
 
 use oracle;
@@ -14,6 +13,7 @@ use crate::config::Excludes;
 
 impl MetaInfo {
     pub fn load(excludes: &Excludes) -> Result<MetaInfo, String> {
+        // sleep for sinchronize log output
         std::thread::sleep(std::time::Duration::from_millis(10));
         println!();
         println!("READING METAINFO FROM ORACLE...");
@@ -32,8 +32,8 @@ impl MetaInfo {
         let mut pks_count = 0;
         let mut indexes_count = 0;
 
-        for (_key,schema) in schemas.iter() {
-            for (_key,table) in schema.tables.iter() {
+        for schema in schemas.iter() {
+            for table in schema.tables.iter() {
                 tables_count += 1;
                 columns_count += table.columns.len();
                 indexes_count += table.indexes.len();
@@ -63,7 +63,7 @@ impl MetaInfo {
         Ok( MetaInfo { schemas })
     }
 
-    fn load_internal(conn: &oracle::Connection, excludes: &Vec<String>) -> oracle::OracleResult<SchemaInfoMap> {
+    fn load_internal(conn: &oracle::Connection, excludes: &Vec<String>) -> oracle::OracleResult<HashSet<SchemaInfo>> {
         let quoted_excludes: Vec<String> = excludes.iter().map(|s| format!("'{}'", s) ).collect();
         let joined_excludes = &quoted_excludes.join(",");
 
@@ -74,7 +74,7 @@ impl MetaInfo {
         Ok(schemas)
     }
 
-    fn load_tables(conn: &oracle::Connection, excludes: &str) -> oracle::OracleResult<SchemaInfoMap> {
+    fn load_tables(conn: &oracle::Connection, excludes: &str) -> oracle::OracleResult<HashSet<SchemaInfo>> {
         // tables and columns queries/iterators are sorted by owner, table_name and synchronized
         let tables_iterator = fetch_tables(conn, excludes)?;
         let columns_iterator = fetch_columns(conn, excludes)?;
@@ -97,7 +97,7 @@ impl MetaInfo {
             (tables.0, tables.1, columns.1)
         });
 
-        let mut result = HashMap::with_capacity(100);
+        let mut result = HashSet::with_capacity(100);
 
         for (schema, tables, columns) in joined {
             // group columns iterator by table name
@@ -109,11 +109,11 @@ impl MetaInfo {
                 (table, columns.1)
             });
 
-            let mut tables = HashMap::with_capacity(200);
+            let mut tables = HashSet::with_capacity(200);
 
             for (table,columns) in joined {
                 // construct table info and push it to tables map
-                let name = Arc::new(table.table_name);
+                let name = table.table_name;
                 let num_rows = table.num_rows;
 
                 let is_view = table.table_type == "VIEW";
@@ -122,20 +122,19 @@ impl MetaInfo {
                 // construct column info and collect it to vector of columns
                 let columns = columns.map(|c|c.into()).collect();
 
-                let table = TableInfo { name: name.clone(), is_view, temporary, num_rows, columns, primary_key: None, indexes: Vec::new() };
-                tables.insert(name, table);
+                let table = TableInfo { name, is_view, temporary, num_rows, columns, primary_key: None, indexes: Vec::new() };
+                tables.insert(table);
             }
 
-            let name = Arc::new(schema);
-            let schema = SchemaInfo { name: name.clone(), tables};
+            let schema = SchemaInfo { name: schema, tables};
 
-            result.insert(name, schema);
+            result.insert(schema);
         };
 
         Ok(result)
     }
 
-    fn load_primary_keys(conn: &oracle::Connection, excludes: &str, schemas: &mut SchemaInfoMap) -> oracle::OracleResult<()> {
+    fn load_primary_keys(conn: &oracle::Connection, excludes: &str, schemas: &mut HashSet<SchemaInfo>) -> oracle::OracleResult<()> {
         let pk_iterator = fetch_primary_keys(conn, excludes)?;
 
         // group primary keys by schema
@@ -144,7 +143,7 @@ impl MetaInfo {
             .group_by(|t| t.owner.clone() );
 
         for (schema, keys) in grouped_keys.into_iter() {
-            let schema = schemas.get_mut(&schema);
+            let schema = schemas.get(schema.as_str());
 
             if let Some(schema) = schema {
                 // group keys by table name and constraint name
@@ -152,10 +151,11 @@ impl MetaInfo {
                     .group_by(|t| (t.table_name.clone(),t.constraint_name.clone()) );
 
                 for ((table_name, name), key_columns) in grouped_keys.into_iter() {
-                    let table_info = schema.tables.get_mut(&table_name);
+                    let table_info = schema.tables.get(table_name.as_str());
                     if let Some(table_info) = table_info {
                         let columns = key_columns.map(|c|c.column_name).collect();
-                        table_info.primary_key = Some(PrimaryKey { name, columns});
+
+                        table_info.set_primary_key(PrimaryKey { name, columns});
                     } // table info found
                 }
             } // schema found
@@ -164,7 +164,7 @@ impl MetaInfo {
         Ok(())
     }
 
-    fn load_indexes(conn: &oracle::Connection, excludes: &str, schemas: &mut HashMap<Arc<String>,SchemaInfo>) -> oracle::OracleResult<()> {
+    fn load_indexes(conn: &oracle::Connection, excludes: &str, schemas: &mut HashSet<SchemaInfo>) -> oracle::OracleResult<()> {
         let idx_iterator = fetch_indexes(conn, excludes)?;
 
         // group indexes by schema
@@ -173,7 +173,7 @@ impl MetaInfo {
             .group_by(|t| t.owner.clone() );
 
         for (schema, indexes) in grouped_indexes.into_iter() {
-            let schema = schemas.get_mut(&schema);
+            let schema = schemas.get(schema.as_str());
 
             if let Some(schema) = schema {
                 // group indexes by table name and index name
@@ -181,14 +181,15 @@ impl MetaInfo {
                     .group_by(|t| t.table_name.clone() );
 
                 for (table_name, indexes) in grouped_indexes.into_iter() {
-                    let table_info = schema.tables.get_mut(&table_name);
+                    let table_info = schema.tables.get(table_name.as_str());
                     if let Some(table_info) = table_info {
                         let indexes = indexes.group_by(|t|(t.index_name.clone(), t.uniqueness.clone()));
 
                         for ((index_name, uniqueness), columns) in indexes.into_iter() {
                             let columns = columns.map(|c| IndexColumn{name: c.column_name, desc: c.descend != "ACC"}).collect();
                             let index = TableIndex {name: index_name, unique: uniqueness == "UNIQUE", columns};
-                            table_info.indexes.push(index);
+
+                            table_info.push_table_index(index);
                         }
                     } // table info found
                 }

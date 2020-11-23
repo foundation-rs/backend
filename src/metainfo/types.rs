@@ -1,21 +1,39 @@
-use std::collections::HashMap;
-use std::sync::Arc;
+use std::collections::HashSet;
+use std::hash::{Hash, Hasher};
 
 use super::ora_source::*;
-
-pub type SchemaInfoMap = HashMap<Arc<String>,SchemaInfo>;
+use std::borrow::Borrow;
+use std::cell::UnsafeCell;
 
 pub struct MetaInfo {
-    pub schemas:  SchemaInfoMap,
+    pub schemas:  HashSet<SchemaInfo>,
 }
 
+#[derive(Debug, Eq)]
 pub struct SchemaInfo {
-    pub name:    Arc<String>,
-    pub tables:  HashMap<Arc<String>,TableInfo>,
+    pub name:    String,
+    pub tables:  HashSet<TableInfo>,
 }
 
+impl Hash for SchemaInfo {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.name.hash(state);
+    }
+}
+impl PartialEq for SchemaInfo {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+    }
+}
+impl Borrow<str> for SchemaInfo {
+    fn borrow(&self) -> &str {
+        &self.name
+    }
+}
+
+#[derive(Debug)]
 pub struct TableInfo {
-    pub name:        Arc<String>,
+    pub name:        String,
     pub is_view:     bool,
     pub temporary:   bool,
     pub num_rows:    i32,
@@ -24,11 +42,58 @@ pub struct TableInfo {
     pub indexes:     Vec<TableIndex>
 }
 
+impl TableInfo {
+
+    pub(crate) fn set_primary_key(&self, pk: PrimaryKey) {
+        self.get_primary_key_as_mutable().replace(pk);
+    }
+
+    pub(crate) fn push_table_index(&self, index: TableIndex) {
+        self.get_indexes_as_mutable().push(index);
+    }
+
+    // hashset don't have get_mut member, but we change only primary key, remaining name unchanged
+    fn get_primary_key_as_mutable(&self) -> &mut Option<PrimaryKey> {
+        let reference = &(self.primary_key);
+        let cont_pointer = reference as *const Option<PrimaryKey>;
+        let mut_pointer = cont_pointer as *mut Option<PrimaryKey>;
+        unsafe { &mut *mut_pointer }
+    }
+
+    // hashset don't have get_mut member, but we change only indexes vector, remaining name unchanged
+    fn get_indexes_as_mutable(&self) -> &mut Vec<TableIndex> {
+        let reference = &(self.indexes);
+        let cont_pointer = reference as *const Vec<TableIndex>;
+        let mut_pointer = cont_pointer as *mut Vec<TableIndex>;
+        unsafe { &mut *mut_pointer }
+    }
+
+}
+
+impl Hash for TableInfo {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.name.hash(state);
+    }
+}
+impl PartialEq for TableInfo {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+    }
+}
+impl Eq for TableInfo {}
+
+impl Borrow<str> for TableInfo {
+    fn borrow(&self) -> &str {
+        &self.name
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum ColumnType {
     Int16, Int32, Int64, Float64, Varchar, DateTime, Blob, Clob, Long, Unsupported
 }
 
+#[derive(Debug)]
 pub struct ColumnInfo {
     pub name:           String,
     pub col_type:       ColumnType,
@@ -41,17 +106,20 @@ pub struct ColumnInfo {
     pub buffer_len:     usize
 }
 
+#[derive(Debug)]
 pub struct PrimaryKey {
     pub name:    String,
     pub columns: Vec<String>
 }
 
+#[derive(Debug)]
 pub struct TableIndex {
     pub name:    String,
     pub unique:  bool,
     pub columns: Vec<IndexColumn>
 }
 
+#[derive(Debug)]
 pub struct IndexColumn {
     pub name: String,
     pub desc: bool
