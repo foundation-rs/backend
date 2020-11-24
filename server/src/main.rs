@@ -13,6 +13,8 @@ mod metainfo;
 mod setup;
 mod utils;
 
+// TODO: threadlocal: https://doc.rust-lang.org/std/macro.thread_local.html
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let log = setup::logging();

@@ -1,11 +1,21 @@
 use std::sync::{Arc, RwLock};
 use std::io::{Error, ErrorKind, Result};
 
-use actix_web::{get, web, HttpResponse, Responder, Scope};
+// TODO: full static files support with NPM build
+// SEE:  https://crates.io/crates/actix-web-static-files
+
+// TODO: analize example https://github.com/actix/examples/blob/master/basics/src/main.rs
+// TODO: example with static files and R2D2: https://stackoverflow.com/questions/63653540/serving-static-files-with-actix-web-2-0
+
+use actix_web::{get, web, HttpResponse, Responder, Scope, HttpRequest};
+use actix_web::http::header::{ContentDisposition, DispositionType};
+use actix_files as fs;
 use serde::{Serialize};
 
 use crate::config::Config;
 use crate::metainfo::{self, MetaInfo};
+use actix_files::{Files, NamedFile};
+use std::path::PathBuf;
 
 // This struct represents state
 pub struct ApplicationState {
@@ -24,13 +34,16 @@ impl ApplicationState {
 // group of base endpoints
 pub fn base_scope() -> Scope {
     web::scope("/")
-        .service(hello)
         .service(health)
+        .service(fs::Files::new("/", "./www")
+            .show_files_listing()
+            .use_last_modified(true))
+        .default_service(web::resource("").route(web::get().to(index)))
 }
 
-#[get("")]
-async fn hello() -> impl Responder {
-    HttpResponse::Ok().body("Hello world!")
+async fn index() -> Result<NamedFile> {
+    let path: PathBuf = "./www/index.html".parse().unwrap();
+    Ok(NamedFile::open(path)?)
 }
 
 #[get("/health")]
