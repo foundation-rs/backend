@@ -8,13 +8,12 @@ use std::io::{Error, ErrorKind, Result};
 // TODO: example with static files and R2D2: https://stackoverflow.com/questions/63653540/serving-static-files-with-actix-web-2-0
 
 use actix_web::{get, web, HttpResponse, Responder, Scope, HttpRequest};
-use actix_web::http::header::{ContentDisposition, DispositionType};
 use actix_files as fs;
 use serde::{Serialize};
 
 use crate::config::Config;
 use crate::metainfo::{self, MetaInfo};
-use actix_files::{Files, NamedFile};
+use actix_files::NamedFile;
 use std::path::PathBuf;
 
 // This struct represents state
@@ -23,11 +22,11 @@ pub struct ApplicationState {
 }
 
 impl ApplicationState {
-    pub fn load(conf: &Config) -> Result<ApplicationState> {
+    pub fn load(conf: &Config) -> Result<Arc<ApplicationState>> {
         let metainfo = metainfo::MetaInfo::load(&conf.excludes)
             .map_err(|e|Error::new(ErrorKind::Other, e))?;
         let metainfo = RwLock::new(metainfo);
-        Ok( ApplicationState{metainfo} )
+        Ok( Arc::new(ApplicationState{metainfo}) )
     }
 }
 

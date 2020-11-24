@@ -1,4 +1,3 @@
-use std::sync::Arc;
 use std::io::{Error, ErrorKind};
 
 use actix_web::{middleware, App, HttpServer};
@@ -29,7 +28,7 @@ async fn main() -> std::io::Result<()> {
     datasource::create(&conf.connection)
         .map_err(|e|Error::new(ErrorKind::Other, e))?;
 
-    let application = Arc::new(application::ApplicationState::load(&conf)? );
+    let application = application::ApplicationState::load(&conf)?;
 
     info!(log, "Server Started on https://{}", &http.listen);
 
