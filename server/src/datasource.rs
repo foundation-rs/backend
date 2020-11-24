@@ -1,7 +1,6 @@
 use std::env;
 use std::sync::RwLock;
 
-// #[macro_use]
 use lazy_static::lazy_static;
 
 use crate::config::ConnectionConfig;
@@ -31,7 +30,6 @@ impl Datasource {
         let pool = oracle::create_pool(url, user, &pw)?;
         Ok(Datasource{pool})
     }
-
 }
 
 pub fn create(config: &ConnectionConfig) -> Result<(), String> {

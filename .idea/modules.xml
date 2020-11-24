@@ -5,6 +5,7 @@
       <module fileurl="file://$PROJECT_DIR$/foundation.iml" filepath="$PROJECT_DIR$/foundation.iml" />
       <module fileurl="file://$PROJECT_DIR$/oracle/oracle.iml" filepath="$PROJECT_DIR$/oracle/oracle.iml" />
       <module fileurl="file://$PROJECT_DIR$/oracle_derive/oracle_derive.iml" filepath="$PROJECT_DIR$/oracle_derive/oracle_derive.iml" />
+      <module fileurl="file://$PROJECT_DIR$/server/server.iml" filepath="$PROJECT_DIR$/server/server.iml" />
     </modules>
   </component>
 </project>

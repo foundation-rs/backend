@@ -5,7 +5,7 @@ use actix_web::{get, web, HttpResponse, Responder, Scope};
 use serde::{Serialize};
 
 use crate::config::Config;
-use crate::metainfo::{self,MetaInfo};
+use crate::metainfo::{self, MetaInfo};
 
 // This struct represents state
 pub struct ApplicationState {
@@ -46,17 +46,19 @@ pub fn metainfo_scope() -> Scope {
         .service(table_metainfo)
 }
 
-// TODO: rename to DatabaseMetainfo
+// group of endpoints for api
+pub fn api_scope() -> Scope {
+    web::scope("/api")
+        .service(table_query_by_pk)
+}
 
 #[derive(Serialize)]
-struct SchemasMetainfo<'a> {
+struct DatabaseMetainfo<'a> {
     schemas: Vec<&'a str>
 }
 
-// TODO: rename to SchemaMetainfo
-
 #[derive(Serialize)]
-struct TablesMetainfo<'a> {
+struct SchemaMetainfo<'a> {
     tables: Vec<TableMetaInfoBrief<'a>>
 }
 
@@ -89,18 +91,16 @@ async fn schemas_metainfo(data: web::Data<Arc<ApplicationState>>) -> impl Respon
     let metainfo = data.metainfo.read().unwrap();
     let mut schemas: Vec<&str> = metainfo.schemas.iter().map(|s|s.name.as_str()).collect();
     schemas.sort();
-    let response = SchemasMetainfo { schemas };
+    let response = DatabaseMetainfo { schemas };
     HttpResponse::Ok().json(response)
 }
 
 #[get("/{schema}")]
 async fn tables_metainfo(path: web::Path<(String,)>, data: web::Data<Arc<ApplicationState>>) -> impl Responder {
-    let schema_name = path.into_inner().0.to_uppercase();
+    let schema_name = path.into_inner().0;
     let metainfo = data.metainfo.read().unwrap();
-    let schema_info = metainfo.schemas.get(schema_name.as_str());
 
-    match schema_info {
-        None => HttpResponse::NotFound().finish(),
+    match metainfo.schemas.get(schema_name.to_uppercase().as_str()) {
         Some(info) => {
             let mut tables: Vec<TableMetaInfoBrief> = info.tables.iter().map(|info|
                 TableMetaInfoBrief {
@@ -110,43 +110,62 @@ async fn tables_metainfo(path: web::Path<(String,)>, data: web::Data<Arc<Applica
                     has_pk: info.primary_key.is_some()
                 }).collect();
             tables.sort_by(|a,b|a.name.cmp(b.name));
-            let response = TablesMetainfo { tables };
-            HttpResponse::Ok().json(response)
-        }
+
+            HttpResponse::Ok().json(SchemaMetainfo { tables })
+        },
+        None => HttpResponse::NotFound().finish()
     }
 }
 
 #[get("/{schema}/{table}")]
 async fn table_metainfo(path: web::Path<(String,String)>, data: web::Data<Arc<ApplicationState>>) -> impl Responder {
     let (schema_name,table_name) = path.into_inner();
-
     let metainfo = data.metainfo.read().unwrap();
-    let schema_info = metainfo.schemas.get(schema_name.to_uppercase().as_str());
 
-    match schema_info {
-        None => HttpResponse::NotFound().finish(),
-        Some(info) => {
-            let table_info = info.tables.get(table_name.to_uppercase().as_str());
+    if let Some(info) = metainfo.schemas.get(schema_name.to_uppercase().as_str()) {
+        if let Some(info) = info.tables.get(table_name.to_uppercase().as_str()) {
+            let columns = info
+                .columns
+                .iter()
+                .map(|c| ColumnMetaInfo { name: c.name.as_str(), col_type: c.col_type_name.as_str(), nullable: c.nullable}).collect();
 
-            match table_info {
-                None => HttpResponse::NotFound().finish(),
-                Some(info) => {
-                    let columns = info
-                        .columns
-                        .iter()
-                        .map(|c| ColumnMetaInfo { name: c.name.as_str(), col_type: c.col_type_name.as_str(), nullable: c.nullable}).collect();
-
-                    let response = TableMetaInfo {
-                        name: info.name.as_str(),
-                        is_view: info.is_view,
-                        temporary: info.temporary,
-                        has_pk: info.primary_key.is_some(),
-                        columns
-                    };
-                    HttpResponse::Ok().json(response)
-                }
-            }
+            let response = TableMetaInfo {
+                name: info.name.as_str(),
+                is_view: info.is_view,
+                temporary: info.temporary,
+                has_pk: info.primary_key.is_some(),
+                columns
+            };
+            return HttpResponse::Ok().json(response)
         }
-    }
+    };
+
+    HttpResponse::NotFound().finish()
 }
 
+#[get("/{schema}/{table}/{pk}")]
+async fn table_query_by_pk(path: web::Path<(String,String,String)>, data: web::Data<Arc<ApplicationState>>) -> impl Responder {
+    let (schema_name,table_name, primary_key) = path.into_inner();
+    let metainfo = data.metainfo.read().unwrap();
+
+    if let Some(info) = metainfo.schemas.get(schema_name.to_uppercase().as_str()) {
+        if let Some(info) = info.tables.get(table_name.to_uppercase().as_str()) {
+            return match &info.primary_key {
+                Some(pk) if pk.columns.len() == 1 => {
+                    let select = generate_select_by_pk(
+                        &info.name,
+                        pk.columns.get(0).unwrap(),
+                        info.columns.iter().map(|c|c.name.as_str()).collect());
+                    HttpResponse::Ok().body(select)
+                },
+                _ => HttpResponse::BadRequest().finish()
+            };
+        }
+    };
+
+    HttpResponse::NotFound().finish()
+}
+
+fn generate_select_by_pk(table_name: &str, pk_column_name: &str, columns: Vec<&str>) -> String {
+    format!("SELECT {} FROM {} WHERE {} = :1", columns.join(","), table_name, pk_column_name)
+}

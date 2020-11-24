@@ -1,0 +1,30 @@
+[package]
+name = "server"
+version = "0.1.0"
+authors = ["Dmitri Astafiev <demius.md@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+oracle = { version = "0.1.0", path = "../oracle" }
+oracle_derive = { version = "0.1.0", path = "../oracle_derive" }
+
+actix-web = { version = "3", features = ["openssl"] }
+actix-slog = "0.2.1"
+slog = "2.5.2"
+slog-async = "2.5.0"
+slog-term = "2.6.0"
+openssl = { version = "0.10", features = ["v110"] }
+
+chrono = { version = "0.4", features = ["serde"] }
+itertools = "0.9.0"
+lazy_static = "1.4.0"
+
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+quick-xml = { version = "0.20", features = [ "serialize" ] }
+
+## build for release: cargo build --release
+## for full minification (strip debug symbols):
+## strip target/release/server

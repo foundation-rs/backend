@@ -38,6 +38,7 @@ async fn main() -> std::io::Result<()> {
             .wrap(middleware::Compress::new(ContentEncoding::Br))
 
             .service(application::metainfo_scope())
+            .service(application::api_scope())
             .service( application::base_scope())
     })
         .bind_openssl(&http.listen, builder)?
