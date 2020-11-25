@@ -100,7 +100,7 @@ pub fn derive_query(input: TokenStream) -> TokenStream {
 //        }
 //    }
 //}
-#[proc_macro_derive(ParamsProvider, attributes(col_size))]
+#[proc_macro_derive(SQLParams, attributes(col_size))]
 pub fn derive_params(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 

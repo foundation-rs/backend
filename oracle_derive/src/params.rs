@@ -27,15 +27,21 @@ pub fn expand_derive_params(input: &syn::DeriveInput) -> Result<TokenStream, Vec
     let members_body = generate_members(&cont);
 
     Ok(quote! {
-        impl #impl_generics oracle::ParamsProvider for #name #ty_generics #where_clause {
+        impl oracle::SQLParams for #name {
+            fn provider() -> Box<dyn oracle::ParamsProvider<Self>> {
+                Box::new(oracle::GeneralMetaProvider::new())
+            }
+        }
+
+        impl #impl_generics oracle::ParamsProvider<#name> for oracle::GeneralMetaProvider<#name> #ty_generics #where_clause {
             #[doc = #doc_comment]
-            fn project_values(&self, projecton: &mut oracle::ParamsProjection) {
-                #project_values_body
+            fn members(&self) -> Vec<oracle::Member> {
+                #members_body
             }
 
             #[doc = #doc_comment]
-            fn members() -> Vec<oracle::Member> {
-                #members_body
+            fn project_values(&self, params: &#name, projecton: &mut oracle::ParamsProjection) {
+                #project_values_body
             }
         }
 
@@ -62,7 +68,7 @@ fn generate_project_values(cont: &Container) -> TokenStream {
         quote_spanned! { f.original.span() =>
           unsafe {
             let p = projecton.get_unchecked_mut(#index);
-            &self.#member.project_value(p);
+            &params.#member.project_value(p);
           }
         }
     });
