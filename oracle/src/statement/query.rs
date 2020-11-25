@@ -5,8 +5,6 @@ use crate::oci;
 
 use crate::OracleResult;
 
-use super::params::ParamsProvider;
-
 use super::Statement;
 use super::results::{
     ResultProcessor,
@@ -15,19 +13,19 @@ use super::results::{
 };
 
 /// Statement with ResultSet (defined result)
-pub struct Query<'conn,P,R> where P: ParamsProvider, R: ResultsProvider {
+pub struct Query<'conn,P,R> where R: ResultsProvider {
     stmt:    Statement<'conn, P>,
     prefetch_rows: usize,
     results: Box<ResultProcessor<'conn, R>>
 }
 
-pub struct QueryIterator<'iter, 'conn: 'iter, P, R: 'conn> where P: ParamsProvider, R: ResultsProvider {
+pub struct QueryIterator<'iter, 'conn: 'iter, P, R: 'conn> where R: ResultsProvider {
     stmt:    Statement<'conn, P>,
     results:  Box<ResultProcessor<'conn, R>>,
     iterator_ptr: *mut ResultIterator<'iter,'conn, R>
 }
 
-impl <'conn,P,R: 'conn> Query<'conn,P,R> where P: ParamsProvider, R: ResultsProvider {
+impl <'conn,P,R: 'conn> Query<'conn,P,R> where R: ResultsProvider {
     pub(crate) fn new(stmt: Statement<'conn,P>, prefetch_rows: usize) -> OracleResult<Query<'conn,P,R>> {
         let results = Box::new( ResultProcessor::new(stmt.conn, stmt.stmthp, prefetch_rows)? );
         Ok( Query { stmt, prefetch_rows, results })
@@ -72,7 +70,7 @@ impl <'conn,P,R: 'conn> Query<'conn,P,R> where P: ParamsProvider, R: ResultsProv
 
 }
 
-impl <'iter, 'conn: 'iter, P, R: 'conn> QueryIterator<'iter,'conn, P, R> where P: ParamsProvider, R: ResultsProvider {
+impl <'iter, 'conn: 'iter, P, R: 'conn> QueryIterator<'iter,'conn, P, R> where R: ResultsProvider {
     fn new(query: Query<'conn,P,R>) -> OracleResult<QueryIterator<'iter,'conn, P, R>> {
         let stmt= query.stmt;
         let results= query.results;
@@ -90,7 +88,7 @@ impl <'iter, 'conn: 'iter, P, R: 'conn> QueryIterator<'iter,'conn, P, R> where P
 
 }
 
-impl <'conn, 'iter: 'conn, P, R: 'conn> Iterator for QueryIterator<'conn, 'iter, P, R> where P: ParamsProvider, R: ResultsProvider {
+impl <'conn, 'iter: 'conn, P, R: 'conn> Iterator for QueryIterator<'conn, 'iter, P, R> where R: ResultsProvider {
     type Item = oci::OracleResult<R>;
 
     fn next(&mut self) -> Option<oci::OracleResult<R>> {
@@ -100,7 +98,7 @@ impl <'conn, 'iter: 'conn, P, R: 'conn> Iterator for QueryIterator<'conn, 'iter,
     }
 }
 
-impl <'conn, 'iter: 'conn, P, R: 'conn> Drop for QueryIterator<'conn, 'iter, P, R> where P: ParamsProvider, R: ResultsProvider {
+impl <'conn, 'iter: 'conn, P, R: 'conn> Drop for QueryIterator<'conn, 'iter, P, R> where R: ResultsProvider {
     fn drop(&mut self) {
         // manually drop ResultIterator with transmute it from raw pointer to original boxed value
         let _boxed: Box<ResultIterator<'_, '_, R>> = unsafe { core::mem::transmute(self.iterator_ptr) };

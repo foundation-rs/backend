@@ -1,5 +1,4 @@
 use std::alloc::{alloc, dealloc, Layout};
-use std::marker::PhantomData;
 use libc;
 
 #[allow(dead_code)]
@@ -33,11 +32,15 @@ pub enum Identifier {
 pub type ParamsProjection = Vec<ParamValue>;
 
 /// Trait for automatic processing of sql statement parameters
-/// Use `#[derive(ParamsProvider)]` for automatic implementation.
+/// Use `#[derive(SQLParams)]` for automatic implementation.
 // See `oracle_derive::ParamsProvider`
-pub trait ParamsProvider {
-    fn members() -> Vec<Member>;
-    fn project_values(&self, projecton: &mut ParamsProjection) -> ();
+pub trait SQLParams {
+    fn provider() -> Box<dyn ParamsProvider<Self>>;
+}
+
+pub trait ParamsProvider<T> {
+    fn members(&self) -> Vec<Member>;
+    fn project_values(&self, params: &T, projecton: &mut ParamsProjection);
 }
 
 pub trait ValueProjector<T> {
@@ -88,18 +91,17 @@ impl <'a> ParamValue {
 
 }
 
-pub(crate) struct ParamsProcessor<P> where P: ParamsProvider {
+pub(crate) struct ParamsProcessor {
     allocated_p:   *mut u8,    // pointer to a main allocated block
     allocated_layout: Layout,  // layout of allocated block
 
+    // cache of allocated blocks to parameters
     pub(crate) projection: RefCell<ParamsProjection>,
-
-    _params: std::marker::PhantomData<P>
 }
 
-impl <P> ParamsProcessor<P> where P: ParamsProvider {
-    pub(crate) fn new(conn: &Connection, stmthp: *mut oci::OCIStmt) -> Result<ParamsProcessor<P>, oci::OracleError> {
-        let members = P::members();
+impl ParamsProcessor {
+    pub(crate) fn new<P>(conn: &Connection, stmthp: *mut oci::OCIStmt, provider: & dyn ParamsProvider<P>) -> Result<ParamsProcessor, oci::OracleError> {
+        let members = provider.members();
         let columns_cnt = members.len();
 
         let val_size = members.iter().map(|m| m.descriptor.size ).sum::<usize>();
@@ -152,12 +154,12 @@ impl <P> ParamsProcessor<P> where P: ParamsProvider {
 
         let projection = RefCell::new(projection);
 
-        Ok(ParamsProcessor {allocated_p, allocated_layout, projection, _params: PhantomData})
+        Ok(ParamsProcessor {allocated_p, allocated_layout, projection})
     }
 
 }
 
-impl <P> Drop for ParamsProcessor<P> where P: ParamsProvider {
+impl Drop for ParamsProcessor {
     fn drop(&mut self) {
         unsafe { dealloc(self.allocated_p, self.allocated_layout); };
     }

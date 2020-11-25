@@ -5,7 +5,7 @@ mod types;
 mod values;
 mod sql_types;
 mod statement;
-mod singulars;
+mod implementors;
 
 pub use oci::{OracleError, OracleResult};
 pub use connection::{Connection, SessionPool, create_pool};
@@ -26,6 +26,7 @@ pub use statement::{
     ResultSet,
     ParamsProvider,
     ParamsProjection,
+    SQLParams
 };
 
 pub use statement::params::{

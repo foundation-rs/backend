@@ -4,7 +4,7 @@
 use crate::oci;
 
 use crate::environment::Environment;
-use crate::{statement, OracleResult, ResultsProvider, ParamsProvider};
+use crate::{statement, OracleResult, ResultsProvider, SQLParams, ParamsProvider};
 
 /// Connection to Oracle and server context
 /*
@@ -127,29 +127,38 @@ impl Connection {
 
     /// Execute generic SQL statement
     pub fn execute<'conn,'s>(&'conn self, sql: &'s str) -> OracleResult<()> {
-        let st = statement::Statement::new(self, sql)?;
+        let st = statement::Statement::new(self, sql, Box::new(()))?;
         st.execute(())
     }
 
     /// Prepare generic oracle statement
     pub fn prepare<P>(&self, sql: &str)
                    -> OracleResult<statement::Statement<P>>
-        where P: ParamsProvider {
-        statement::Statement::new(self, sql)
+        where P: SQLParams {
+        let provider = P::provider();
+        statement::Statement::new(self, sql, provider)
+    }
+
+    /// Prepare generic oracle statement with dynamic params provider
+    pub fn prepare_dynamic<P>(&self, sql: &str, provider: Box<dyn ParamsProvider<P>>)
+                      -> OracleResult<statement::Statement<P>> {
+        statement::Statement::new(self, sql, provider)
     }
 
     /// Prepare query with default 10 prefetch rows
-    pub fn query<'conn, P,R: 'conn>(&'conn self, sql: &str)
+    pub fn query<'conn, P, R: 'conn>(&'conn self, sql: &str)
                     -> OracleResult<statement::Query<P,R>>
-        where P: ParamsProvider, R: ResultsProvider {
-        statement::Statement::new(self, sql)?.query()
+        where P: SQLParams, R: ResultsProvider {
+        let provider = P::provider();
+        statement::Statement::new(self, sql, provider)?.query()
     }
 
     /// Prepare query with 1 row
     pub fn query_one<'conn, P,R: 'conn>(&'conn self, sql: &str)
                     -> OracleResult<statement::Query<P,R>>
-        where P: ParamsProvider, R: ResultsProvider {
-        statement::Statement::new(self, sql)?.query_one()
+        where P: SQLParams, R: ResultsProvider {
+        let provider = P::provider();
+        statement::Statement::new(self, sql, provider)?.query_one()
     }
 
 }

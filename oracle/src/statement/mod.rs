@@ -3,8 +3,6 @@ pub mod params;
 mod results;
 mod query;
 
-use std::marker::PhantomData;
-
 #[allow(dead_code)]
 #[allow(non_snake_case)]
 #[allow(non_camel_case_types)]
@@ -22,7 +20,8 @@ pub use self::results::{
 pub use self::params::{
     ParamsProjection,
     ParamsProvider,
-    ParamValue
+    ParamValue,
+    SQLParams
 };
 pub use self::query::{
     Query,
@@ -33,19 +32,18 @@ use crate::{OracleResult, OracleError};
 
 /// Generic prepared statement with parameters (bindings)
 /// Parameters may be () - Unit
-pub struct Statement<'conn, P> where P: ParamsProvider {
-    conn:    &'conn Connection,
-    stmthp:  *mut oci::OCIStmt,
-
-    params:  ParamsProcessor<P>,
-    _params: std::marker::PhantomData<P>
+pub struct Statement<'conn, P> {
+    conn:     &'conn Connection,
+    stmthp:   *mut oci::OCIStmt,
+    provider: Box<dyn ParamsProvider<P>>,
+    params:   ParamsProcessor
 }
 
-impl <'conn,P> Statement<'conn,P> where P: ParamsProvider {
-    pub(crate) fn new<'s>(conn: &'conn Connection, sql:  &'s str) -> OracleResult<Statement<'conn,P>> {
+impl <'conn,P> Statement<'conn,P> {
+    pub(crate) fn new<'s>(conn: &'conn Connection, sql:  &'s str, provider: Box<dyn ParamsProvider<P>>) -> OracleResult<Statement<'conn,P>> {
         let stmthp = oci::stmt_prepare(conn.svchp, conn.errhp, sql)?;
-        let params = ParamsProcessor::new(conn, stmthp)?;
-        Ok( Statement { conn, stmthp, params, _params: PhantomData } )
+        let params = ParamsProcessor::new(conn, stmthp, provider.as_ref())?;
+        Ok( Statement { conn, stmthp, provider, params } )
     }
 
     /// Prepare oracle statement with prefetch rows == 10
@@ -73,13 +71,13 @@ impl <'conn,P> Statement<'conn,P> where P: ParamsProvider {
         let mut projection = self.params.projection
             .try_borrow_mut()
             .map_err(|err|OracleError::new(format!("Can not borrow params-projection for set-params: {}", err),"Statement::set_params"))?;
-        params.project_values(projection.as_mut());
+        self.provider.project_values(&params, projection.as_mut());
         Ok(())
     }
 
 }
 
-impl <P> Drop for Statement<'_,P> where P: ParamsProvider {
+impl <P> Drop for Statement<'_,P> {
     fn drop(&mut self) {
         oci::stmt_release(self.stmthp, self.conn.errhp);
     }
