@@ -1,5 +1,4 @@
 use std::alloc::{alloc, dealloc, Layout};
-use std::marker::PhantomData;
 use libc;
 
 #[allow(dead_code)]
@@ -14,6 +13,7 @@ use crate::OracleResult;
 
 /// Contains row data for one item.
 /// Used for result-set
+#[derive(Debug, Copy, Clone)]
 pub enum ResultValue {
     Val {
         valp: *const u8,
@@ -25,11 +25,15 @@ pub enum ResultValue {
 pub type ResultSet = Vec<ResultValue>;
 
 /// Trait for automatic processing of sql statement results.
-/// Use `#[derive(ResultsProvider)]` for automatic implementation.
-/// See `oracle_derive::ResultsProvider`
-pub trait ResultsProvider {
-    fn sql_descriptors() -> Vec<TypeDescriptor>;
-    fn from_resultset(rs: &ResultSet) -> Self;
+/// Use `#[derive(SQLResults)]` for automatic implementation.
+/// See `oracle_derive::SQLResults`
+pub trait SQLResults {
+    fn provider() -> Box<dyn ResultsProvider<Self>>;
+}
+
+pub trait ResultsProvider<T> {
+    fn sql_descriptors(&self) -> Vec<TypeDescriptor>;
+    fn gen_result(&self, rs: ResultSet) -> T;
 }
 
 impl <'a> ResultValue {
@@ -55,7 +59,7 @@ impl <'a> ResultValue {
 
 }
 
-pub(crate) struct ResultProcessor<'conn, R> where R: ResultsProvider {
+pub(crate) struct ResultProcessor<'conn> {
     conn:    &'conn Connection,
     stmthp:  *mut oci::OCIStmt,
 
@@ -68,23 +72,21 @@ pub(crate) struct ResultProcessor<'conn, R> where R: ResultsProvider {
     values_p:      *const u8,  // pointer to values area
     indicators_p:  *const i16, // pointer to indicators area
     ret_lengths_p: *const u16, // pointer to return length area,
-
-    _result: std::marker::PhantomData<R>
 }
 
-pub struct ResultIterator<'iter, 'conn: 'iter, R> where R: ResultsProvider {
-    processor:          &'iter ResultProcessor<'conn, R>,
+pub struct ResultIterator<'iter, 'conn: 'iter> {
+    processor:          &'iter ResultProcessor<'conn>,
     done:               bool,
     initial_prefetched: u32,
     rows_fetched:       u32,
     cursor_index:       u32
 }
 
-impl <'conn, R> ResultProcessor<'conn, R> where R: ResultsProvider {
+impl <'conn> ResultProcessor<'conn> {
 
-    pub(crate) fn new(conn: &'conn Connection, stmthp: *mut oci::OCIStmt, prefetch_rows: usize)
-                      -> Result<ResultProcessor<'conn, R>, oci::OracleError> {
-        let descriptors = R::sql_descriptors();
+    pub(crate) fn new<'p, R>(conn: &'conn Connection, stmthp: *mut oci::OCIStmt, provider: &'p dyn ResultsProvider<R>, prefetch_rows: usize)
+                      -> Result<ResultProcessor<'conn>, oci::OracleError> {
+        let descriptors = provider.sql_descriptors();
         let columns_cnt = descriptors.len();
         let mut sizes = Vec::with_capacity(columns_cnt);
 
@@ -127,7 +129,7 @@ impl <'conn, R> ResultProcessor<'conn, R> where R: ResultsProvider {
 
         oci::set_prefetch_size(stmthp, conn.errhp, prefetch_rows as u32)?;
 
-        Ok( ResultProcessor {conn, stmthp, prefetch_rows, sizes, allocated_p, allocated_layout, values_p, indicators_p, ret_lengths_p, _result: PhantomData} )
+        Ok( ResultProcessor {conn, stmthp, prefetch_rows, sizes, allocated_p, allocated_layout, values_p, indicators_p, ret_lengths_p} )
     }
 
     fn get_last_fetched_rows(&self) -> OracleResult<u32> {
@@ -138,7 +140,7 @@ impl <'conn, R> ResultProcessor<'conn, R> where R: ResultsProvider {
         Ok(rows_fetched)
     }
 
-    pub (crate) fn fetch_iter<'iter> (&'conn self) -> OracleResult<ResultIterator<'iter, 'conn, R>> {
+    pub (crate) fn fetch_iter<'iter> (&'conn self) -> OracleResult<ResultIterator<'iter, 'conn>> {
         let iters = self.prefetch_rows as u32;
         let success = oci::stmt_execute(self.conn.svchp, self.stmthp, self.conn.errhp, iters, 0)?;
 
@@ -206,24 +208,24 @@ impl <'conn, R> ResultProcessor<'conn, R> where R: ResultsProvider {
     }
 }
 
-impl <R> Drop for ResultProcessor<'_,R> where R: ResultsProvider {
+impl Drop for ResultProcessor<'_> {
     fn drop(&mut self) {
         unsafe { dealloc(self.allocated_p, self.allocated_layout); };
     }
 }
 
-impl <'iter, 'conn: 'iter, R> ResultIterator<'iter, 'conn, R> where R: ResultsProvider {
-    fn new(processor: &'conn ResultProcessor<'conn,R>, initial_prefetched: u32) -> ResultIterator<'iter, 'conn, R> {
+impl <'iter, 'conn: 'iter> ResultIterator<'iter, 'conn> {
+    fn new(processor: &'conn ResultProcessor<'conn>, initial_prefetched: u32) -> ResultIterator<'iter, 'conn> {
         // println!("ResultIterator created");
         ResultIterator { processor, done: false, initial_prefetched, rows_fetched: 0, cursor_index: 0 }
     }
 
 }
 
-impl <'iter, 'conn: 'iter, R> Iterator for ResultIterator<'iter, 'conn, R> where R: ResultsProvider {
-    type Item = oci::OracleResult<R>;
+impl <'iter, 'conn: 'iter> Iterator for ResultIterator<'iter, 'conn> {
+    type Item = oci::OracleResult<ResultSet>;
 
-    fn next(&mut self) -> Option<oci::OracleResult<R>> {
+    fn next(&mut self) -> Option<oci::OracleResult<ResultSet>> {
         // println!("ResultIterator first fetch");
         if self.done && self.cursor_index == 0 {
             return None;
@@ -273,7 +275,8 @@ impl <'iter, 'conn: 'iter, R> Iterator for ResultIterator<'iter, 'conn, R> where
                 self.cursor_index = 0;
             }
 
-            Some(Ok(R::from_resultset(&result)))
+            // Some(Ok(self.processor.provider.gen_result(&result)))
+            Some(Ok(result))
         } else {
             // println!("ResultIterator::rows_fetched == 0");
             None

@@ -58,10 +58,6 @@ mod constants {
     pub const SQLT_BOL: u16 = 252;
 }
 
-pub trait DescriptorsProvider {
-    fn sql_descriptors() -> Vec<TypeDescriptor>;
-}
-
 /// incapsulate Oracle SQL Types
 #[derive(Debug)]
 pub struct TypeDescriptor {
@@ -165,9 +161,23 @@ impl TypeDescriptorProducer<&str> for &str {
 }
 
 // all about dates
+use chrono::prelude::*;
+
+// Date and Datetime
+
+// TODO: Oracle Datetime have 7 bytes
+// TODO: Oracle Timestamp have 11 bytes
+
+// converts to Oracle Datetime (4 bytes)
+pub type SqlDate = Date<Local>;
+
+// converts to Oracle Datetime (7 bytes)
+pub type SqlDateTime = DateTime<Local>;
+
+// converts to Oracle Timestamp (11 bytes)
+// pub type SqlTimestamp = DateTime<Local>;
 
 // TODO: inconsistency between timestamp and datetime
-use crate::sql_types::*;
 
 impl_descriptors_producer!(SqlDate, DATE_SQLTYPE);
 impl_descriptors_producer!(SqlDateTime, DATE_SQLTYPE);

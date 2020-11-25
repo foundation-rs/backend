@@ -38,7 +38,7 @@ mod utils;
 //     }
 // }
 ///
-#[proc_macro_derive(ResultsProvider, attributes(col_size))]
+#[proc_macro_derive(SQLResults, attributes(col_size))]
 pub fn derive_query(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 

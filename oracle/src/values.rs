@@ -9,14 +9,14 @@ use crate::ValueProjector;
 macro_rules! convert_sql_and_primitive {
     ($T:ty) => {
 
-        impl From<&ResultValue> for $T {
-            fn from(v: &ResultValue) -> $T {
+        impl From<ResultValue> for $T {
+            fn from(v: ResultValue) -> $T {
                 v.map_or(Default::default(),|valp,_|unsafe { transmute::<*const u8, &$T>(valp) }.to_owned())
             }
         }
 
-        impl From<&ResultValue> for Option<$T> {
-            fn from(v: &ResultValue) -> Option<$T> {
+        impl From<ResultValue> for Option<$T> {
+            fn from(v: ResultValue) -> Option<$T> {
                 v.map(|valp,_|unsafe { transmute::<*const u8, &$T>(valp) }.to_owned())
             }
         }
@@ -50,8 +50,8 @@ convert_sql_and_primitive!(f64);
 
 // String type, in Oracle NULL String is Empty String
 
-impl From<&ResultValue> for String {
-    fn from(v: &ResultValue) -> String {
+impl From<ResultValue> for String {
+    fn from(v: ResultValue) -> String {
         v.map_or(String::new(),|valp,len| {
             let str_len = len as usize;
             let mut dst = Vec::with_capacity(str_len) as Vec<u8>;
@@ -98,8 +98,8 @@ impl ValueProjector<&str> for &str {
 
 // boolean type mapped to u16 (INT TYPE IN DB), NULL is False
 
-impl From<&ResultValue> for bool {
-    fn from(v: &ResultValue) -> bool {
+impl From<ResultValue> for bool {
+    fn from(v: ResultValue) -> bool {
         let int_val = v.map_or(0,|valp,_| unsafe { transmute::<*const u8, &u16>(valp) }.to_owned());
         int_val == 0
     }
@@ -119,31 +119,31 @@ impl ValueProjector<bool> for bool {
 
 // Date and Datetime
 use chrono::prelude::*;
-use crate::sql_types::*;
+use crate::types::{SqlDate, SqlDateTime};
 
 // TODO: Datetime have 7 bytes
 // TODO: Timestamp have 11 bytes
 
-impl From<&ResultValue> for SqlDate {
-    fn from(v: &ResultValue) -> SqlDate {
+impl From<ResultValue> for SqlDate {
+    fn from(v: ResultValue) -> SqlDate {
         v.map_or(Local::now().date(),date_from_row)
     }
 }
 
-impl From<&ResultValue> for SqlDateTime {
-    fn from(v: &ResultValue) -> SqlDateTime {
+impl From<ResultValue> for SqlDateTime {
+    fn from(v: ResultValue) -> SqlDateTime {
         v.map_or(Local::now(),datetime_from_row)
     }
 }
 
-impl From<&ResultValue> for Option<SqlDate> {
-    fn from(v: &ResultValue) -> Option<SqlDate> {
+impl From<ResultValue> for Option<SqlDate> {
+    fn from(v: ResultValue) -> Option<SqlDate> {
         v.map(date_from_row)
     }
 }
 
-impl From<&ResultValue> for Option<SqlDateTime> {
-    fn from(v: &ResultValue) -> Option<SqlDateTime> {
+impl From<ResultValue> for Option<SqlDateTime> {
+    fn from(v: ResultValue) -> Option<SqlDateTime> {
         v.map(datetime_from_row)
     }
 }

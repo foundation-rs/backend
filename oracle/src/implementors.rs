@@ -1,5 +1,6 @@
+use std::convert::TryInto;
+
 // TODO: inconsistency between timestamp and datetime
-use crate::sql_types::*;
 use crate::{
     ParamsProjection,
     ParamsProvider,
@@ -9,44 +10,39 @@ use crate::{
     Member,
     Identifier,
     ValueProjector,
-    SQLParams
+    SQLParams,
+    SQLResults
 };
 use crate::types::*;
+use crate::statement::ResultValue;
 
 // impl metainfo for singular primitive types
 
-macro_rules! impl_results_provider {
-    ($T:ty, $name:ident) => {
+/// general params/result provider
+pub struct GeneralMetaProvider<T> {
+    _marker: std::marker::PhantomData<T>
+}
 
-        impl ResultsProvider for $T {
-
-            fn sql_descriptors() -> Vec<TypeDescriptor> {
-                vec![$name]
-            }
-
-            fn from_resultset(rs: &ResultSet) -> Self {
-                let s0 = &(rs[0]);
-                s0.into()
-            }
-        }
-
+impl <T> GeneralMetaProvider<T> {
+    pub fn new() -> GeneralMetaProvider<T> {
+        GeneralMetaProvider { _marker: std::marker::PhantomData }
     }
 }
 
-impl_results_provider!(u32, U32_SQLTYPE);
-impl_results_provider!(i32, I32_SQLTYPE);
-impl_results_provider!(bool, BOOL_SQLTYPE);
-
-impl_results_provider!(SqlDate, DATE_SQLTYPE);
-impl_results_provider!(SqlDateTime, DATETIME_SQLTYPE);
-
-impl ResultsProvider for String {
-    fn from_resultset(rs: &ResultSet) -> Self {
-        let s0 = &(rs[0]);
-        s0.into()
+impl <T: 'static> SQLResults for T where T: TypeDescriptorProducer<T> + From<ResultValue> {
+    fn provider() -> Box<dyn ResultsProvider<Self>> {
+        Box::new(GeneralMetaProvider::new())
     }
-    fn sql_descriptors() -> Vec<TypeDescriptor> {
-        vec![string_sqltype(128)]
+}
+
+impl <T> ResultsProvider<T> for GeneralMetaProvider<T>
+    where T: TypeDescriptorProducer<T> + From<ResultValue> {
+    fn sql_descriptors(&self) -> Vec<TypeDescriptor> {
+        vec![T::produce()]
+    }
+    fn gen_result(&self, rs: ResultSet) -> T {
+        let values: [ResultValue; 1] = rs.try_into().unwrap();
+        values[0].into()
     }
 }
 
@@ -54,19 +50,13 @@ impl ResultsProvider for String {
 impl <T> SQLParams for T
     where T: 'static + TypeDescriptorProducer<T> + ValueProjector<T> {
     fn provider() -> Box<dyn ParamsProvider<Self>> {
-        Box::new(GeneralParamsProvider{ _marker: std::marker::PhantomData })
+        Box::new(GeneralMetaProvider::new())
     }
 }
 
-/// general params provider for singular type
-struct GeneralParamsProvider<T>
-    where T: TypeDescriptorProducer<T> + ValueProjector<T> {
-    _marker: std::marker::PhantomData<T>
-}
-
 // implement params provider for singular type
-impl <T> ParamsProvider<T> for GeneralParamsProvider<T>
-    where T: TypeDescriptorProducer<T> + ValueProjector<T> {
+impl <T> ParamsProvider<T> for GeneralMetaProvider<T>
+    where T: 'static + TypeDescriptorProducer<T> + ValueProjector<T> {
     fn members(&self) -> Vec<Member> {
         vec![
             Member::new(T::produce(), Identifier::Unnamed),
@@ -99,22 +89,26 @@ impl <T,V> SQLParams for (T,V)
     where T: 'static + TypeDescriptorProducer<T> + ValueProjector<T>,
           V: 'static + TypeDescriptorProducer<V> + ValueProjector<V> {
     fn provider() -> Box<dyn ParamsProvider<Self>> {
-        Box::new(GeneralPairParamsProvider{
-            _m0: std::marker::PhantomData,
-            _m1: std::marker::PhantomData
-        })
+        Box::new(GeneralPairProvider::new())
     }
 }
 
-struct GeneralPairParamsProvider<T,V>
-    where T: TypeDescriptorProducer<T> + ValueProjector<T>,
-          V: TypeDescriptorProducer<V> + ValueProjector<V> {
+struct GeneralPairProvider<T,V> {
     _m0: std::marker::PhantomData<T>,
     _m1: std::marker::PhantomData<V>,
 }
 
+impl <T,V> GeneralPairProvider<T,V> {
+    pub fn new() -> GeneralPairProvider<T,V> {
+        GeneralPairProvider {
+            _m0: std::marker::PhantomData,
+            _m1: std::marker::PhantomData
+        }
+    }
+}
+
 // implement params provider for pair tuple
-impl <T,V> ParamsProvider<(T,V)> for GeneralPairParamsProvider<T,V>
+impl <T,V> ParamsProvider<(T,V)> for GeneralPairProvider<T,V>
     where T: TypeDescriptorProducer<T> + ValueProjector<T>,
           V: TypeDescriptorProducer<V> + ValueProjector<V>,
 {
@@ -134,5 +128,19 @@ impl <T,V> ParamsProvider<(T,V)> for GeneralPairParamsProvider<T,V>
             let p = projecton.get_unchecked_mut(1);
             &params.1.project_value(p);
         }
+    }
+}
+
+// implement params provider for pair tuple
+impl <T,V> ResultsProvider<(T,V)> for GeneralPairProvider<T,V>
+    where T: TypeDescriptorProducer<T> + From<ResultValue>,
+          V: TypeDescriptorProducer<V> + From<ResultValue>,
+{
+    fn sql_descriptors(&self) -> Vec<TypeDescriptor> {
+        vec![T::produce(), V::produce()]
+    }
+    fn gen_result(&self, rs: ResultSet) -> (T,V) {
+        let values: [ResultValue; 2] = rs.try_into().unwrap();
+        (values[0].into(),values[1].into())
     }
 }

@@ -4,7 +4,7 @@
 use crate::oci;
 
 use crate::environment::Environment;
-use crate::{statement, OracleResult, ResultsProvider, SQLParams, ParamsProvider};
+use crate::{statement, OracleResult, SQLParams, ParamsProvider, SQLResults};
 
 /// Connection to Oracle and server context
 /*
@@ -147,16 +147,16 @@ impl Connection {
 
     /// Prepare query with default 10 prefetch rows
     pub fn query<'conn, P, R: 'conn>(&'conn self, sql: &str)
-                    -> OracleResult<statement::Query<P,R>>
-        where P: SQLParams, R: ResultsProvider {
+                    -> OracleResult<statement::Query<'conn, P,R>>
+        where P: SQLParams, R: SQLResults {
         let provider = P::provider();
         statement::Statement::new(self, sql, provider)?.query()
     }
 
     /// Prepare query with 1 row
     pub fn query_one<'conn, P,R: 'conn>(&'conn self, sql: &str)
-                    -> OracleResult<statement::Query<P,R>>
-        where P: SQLParams, R: ResultsProvider {
+                    -> OracleResult<statement::Query<'conn, P,R>>
+        where P: SQLParams, R: SQLResults {
         let provider = P::provider();
         statement::Statement::new(self, sql, provider)?.query_one()
     }

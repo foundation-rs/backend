@@ -1,8 +1,8 @@
 use oracle;
 use oracle::QueryIterator;
-use oracle_derive::ResultsProvider;
+use oracle_derive::SQLResults;
 
-#[derive(ResultsProvider)]
+#[derive(SQLResults)]
 pub struct OraTable {
     pub owner:      String,
     pub table_name: String,
@@ -15,7 +15,7 @@ pub struct OraTable {
 
 pub type TablesIterator<'iter, 'conn> = QueryIterator<'iter, 'conn, (), OraTable>;
 
-#[derive(ResultsProvider)]
+#[derive(SQLResults)]
 pub struct OraTableColumn {
     pub owner:          String,
     pub table_name:     String,
@@ -30,7 +30,7 @@ pub struct OraTableColumn {
 
 pub type ColumnsIterator<'iter, 'conn> = QueryIterator<'iter, 'conn, (), OraTableColumn>;
 
-#[derive(ResultsProvider)]
+#[derive(SQLResults)]
 pub struct OraTablePrimaryKeyColumn {
     pub owner:           String,
     pub table_name:      String,
@@ -40,7 +40,7 @@ pub struct OraTablePrimaryKeyColumn {
 
 pub type PrimaryKeyColumnsIterator<'iter, 'conn> = QueryIterator<'iter, 'conn, (), OraTablePrimaryKeyColumn>;
 
-#[derive(ResultsProvider)]
+#[derive(SQLResults)]
 pub struct OraTableIndexColumn {
     pub owner:       String,
     pub table_name:  String,

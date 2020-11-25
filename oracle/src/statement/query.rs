@@ -13,22 +13,24 @@ use super::results::{
 };
 
 /// Statement with ResultSet (defined result)
-pub struct Query<'conn,P,R> where R: ResultsProvider {
+pub struct Query<'conn,P,R> {
     stmt:    Statement<'conn, P>,
     prefetch_rows: usize,
-    results: Box<ResultProcessor<'conn, R>>
+    provider: Box<dyn ResultsProvider<R>>,
+    results: Box<ResultProcessor<'conn>>
 }
 
-pub struct QueryIterator<'iter, 'conn: 'iter, P, R: 'conn> where R: ResultsProvider {
+pub struct QueryIterator<'iter, 'conn: 'iter, P, R: 'conn> {
     stmt:    Statement<'conn, P>,
-    results:  Box<ResultProcessor<'conn, R>>,
-    iterator_ptr: *mut ResultIterator<'iter,'conn, R>
+    provider: Box<dyn ResultsProvider<R>>,
+    results:  Box<ResultProcessor<'conn>>,
+    iterator_ptr: *mut ResultIterator<'iter,'conn>
 }
 
-impl <'conn,P,R: 'conn> Query<'conn,P,R> where R: ResultsProvider {
-    pub(crate) fn new(stmt: Statement<'conn,P>, prefetch_rows: usize) -> OracleResult<Query<'conn,P,R>> {
-        let results = Box::new( ResultProcessor::new(stmt.conn, stmt.stmthp, prefetch_rows)? );
-        Ok( Query { stmt, prefetch_rows, results })
+impl <'conn,P,R: 'conn> Query<'conn,P,R> {
+    pub(crate) fn new(stmt: Statement<'conn,P>, provider: Box<dyn ResultsProvider<R>>, prefetch_rows: usize) -> OracleResult<Query<'conn,P,R>> {
+        let results = Box::new( ResultProcessor::new(stmt.conn, stmt.stmthp, provider.as_ref(), prefetch_rows)? );
+        Ok( Query { stmt, prefetch_rows, provider, results })
     }
 
     pub fn fetch_iter<'iter>(self, params: P) -> OracleResult<QueryIterator<'iter, 'conn, P, R>> {
@@ -47,7 +49,7 @@ impl <'conn,P,R: 'conn> Query<'conn,P,R> where R: ResultsProvider {
 
         for v in iterator {
             match v {
-                Ok(v) => result.push(v),
+                Ok(v) => result.push(self.provider.gen_result(v)),
                 Err(err) => return Err(err)
             };
         }
@@ -63,17 +65,18 @@ impl <'conn,P,R: 'conn> Query<'conn,P,R> where R: ResultsProvider {
         let mut iterator = self.results.fetch_iter()?;
 
         match iterator.next() {
-            Some(v) => v,
+            Some(v) => v.map(|r|self.provider.gen_result(r)),
             None => Err(oci::OracleError::new("The request returned no data".to_owned(), "statement.fetch_one"))
         }
     }
 
 }
 
-impl <'iter, 'conn: 'iter, P, R: 'conn> QueryIterator<'iter,'conn, P, R> where R: ResultsProvider {
+impl <'iter, 'conn: 'iter, P, R: 'conn> QueryIterator<'iter,'conn, P, R> {
     fn new(query: Query<'conn,P,R>) -> OracleResult<QueryIterator<'iter,'conn, P, R>> {
         let stmt= query.stmt;
         let results= query.results;
+        let provider = query.provider;
 
         // transmute boxed ResultIterator into raw pointer
         // because Rust have problems with self-referencials structs
@@ -83,24 +86,26 @@ impl <'iter, 'conn: 'iter, P, R: 'conn> QueryIterator<'iter,'conn, P, R> where R
             unsafe { core::mem::transmute(iterator) }
         };
 
-        Ok( QueryIterator { stmt, results, iterator_ptr } )
+        Ok( QueryIterator { stmt, provider, results, iterator_ptr } )
     }
 
 }
 
-impl <'conn, 'iter: 'conn, P, R: 'conn> Iterator for QueryIterator<'conn, 'iter, P, R> where R: ResultsProvider {
+impl <'conn, 'iter: 'conn, P, R: 'conn> Iterator for QueryIterator<'conn, 'iter, P, R> {
     type Item = oci::OracleResult<R>;
 
     fn next(&mut self) -> Option<oci::OracleResult<R>> {
         unsafe {
-            (*self.iterator_ptr).next()
+            (*self.iterator_ptr)
+                .next()
+                .map(|r|r.map(|r|self.provider.gen_result(r)))
         }
     }
 }
 
-impl <'conn, 'iter: 'conn, P, R: 'conn> Drop for QueryIterator<'conn, 'iter, P, R> where R: ResultsProvider {
+impl <'conn, 'iter, P, R> Drop for QueryIterator<'conn, 'iter, P, R> {
     fn drop(&mut self) {
         // manually drop ResultIterator with transmute it from raw pointer to original boxed value
-        let _boxed: Box<ResultIterator<'_, '_, R>> = unsafe { core::mem::transmute(self.iterator_ptr) };
+        let _boxed: Box<ResultIterator<'_, '_>> = unsafe { core::mem::transmute(self.iterator_ptr) };
     }
 }

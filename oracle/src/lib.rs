@@ -3,19 +3,16 @@ mod oci;
 mod connection;
 mod types;
 mod values;
-mod sql_types;
 mod statement;
 mod implementors;
 
 pub use oci::{OracleError, OracleResult};
 pub use connection::{Connection, SessionPool, create_pool};
 
-pub use sql_types::{SqlDate, SqlDateTime};
-
 pub use types::{
-    DescriptorsProvider,
     TypeDescriptor,
-    TypeDescriptorProducer
+    TypeDescriptorProducer,
+    SqlDate, SqlDateTime
 };
 
 pub use statement::{
@@ -26,7 +23,8 @@ pub use statement::{
     ResultSet,
     ParamsProvider,
     ParamsProjection,
-    SQLParams
+    SQLParams,
+    SQLResults
 };
 
 pub use statement::params::{
@@ -34,3 +32,5 @@ pub use statement::params::{
     Member,
     ValueProjector
 };
+
+pub use implementors::GeneralMetaProvider;

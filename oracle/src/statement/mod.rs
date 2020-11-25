@@ -15,7 +15,8 @@ use self::params::ParamsProcessor;
 pub use self::results::{
     ResultsProvider,
     ResultSet,
-    ResultValue
+    ResultValue,
+    SQLResults
 };
 pub use self::params::{
     ParamsProjection,
@@ -47,18 +48,26 @@ impl <'conn,P> Statement<'conn,P> {
     }
 
     /// Prepare oracle statement with prefetch rows == 10
-    pub fn query<R: 'conn +  ResultsProvider>(self) -> OracleResult<Query<'conn,P,R>> {
-        Query::new(self, 10)
+    pub fn query<R: 'conn + SQLResults>(self) -> OracleResult<Query<'conn,P,R>> {
+        let provider = R::provider();
+        Query::new(self, provider, 10)
     }
 
     /// Prepare oracle statement with prefetch rows == 1
-    pub fn query_one<R: 'conn +  ResultsProvider>(self) -> OracleResult<Query<'conn,P,R>> {
-        Query::new(self, 1)
+    pub fn query_one<R: 'conn + SQLResults>(self) -> OracleResult<Query<'conn,P,R>> {
+        let provider = R::provider();
+        Query::new(self, provider, 1)
     }
 
     /// Prepare oracle statement with custom prefetch rows
-    pub fn query_many<R: 'conn +  ResultsProvider>(self, prefetch_rows: usize) -> OracleResult<Query<'conn,P,R>> {
-        Query::new(self, prefetch_rows)
+    pub fn query_many<R: 'conn + SQLResults>(self, prefetch_rows: usize) -> OracleResult<Query<'conn,P,R>> {
+        let provider = R::provider();
+        Query::new(self, provider, prefetch_rows)
+    }
+
+    /// Prepare oracle statement with custom prefetch rows
+    pub fn query_dynamic<'p, R: 'conn>(self, provider: Box<dyn ResultsProvider<R>>, prefetch_rows: usize) -> OracleResult<Query<'conn,P,R>> {
+        Query::new(self, provider, prefetch_rows)
     }
 
     /// Execute generic statement with params

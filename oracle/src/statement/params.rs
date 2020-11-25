@@ -33,7 +33,7 @@ pub type ParamsProjection = Vec<ParamValue>;
 
 /// Trait for automatic processing of sql statement parameters
 /// Use `#[derive(SQLParams)]` for automatic implementation.
-// See `oracle_derive::ParamsProvider`
+// See `oracle_derive::SQLParams`
 pub trait SQLParams {
     fn provider() -> Box<dyn ParamsProvider<Self>>;
 }

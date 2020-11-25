@@ -1,4 +1,4 @@
-use proc_macro2::{Literal, Span, TokenStream};
+use proc_macro2::{Literal, TokenStream};
 use syn::{self, Data, Field, Ident, Index, Member, spanned::Spanned, Type, TypePath};
 use quote::{quote, quote_spanned};
 
