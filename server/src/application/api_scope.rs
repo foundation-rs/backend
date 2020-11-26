@@ -5,6 +5,7 @@ use oracle::{self, ValueProjector};
 
 use crate::application::ApplicationState;
 use crate::metainfo as mi;
+use std::ffi::OsString;
 
 // group of endpoints for api
 pub fn api_scope() -> Scope {
@@ -89,13 +90,29 @@ impl DynamicQuery {
     }
 }
 
-impl oracle::ResultsProvider<DynamicQuery> for DynamicQuery {
+impl oracle::ResultsProvider<String> for DynamicQuery {
     fn sql_descriptors(&self) -> Vec<oracle::TypeDescriptor> {
         self.column_type_descriptors.clone()
     }
 
-    fn gen_result(&self, rs: oracle::ResultSet) -> DynamicQuery {
-        unimplemented!()
+    fn gen_result(&self, rs: oracle::ResultSet) -> String {
+        let mut results = Vec::with_capacity(self.column_names.len());
+
+        for (idx,t) in self.column_types.iter().enumerate() {
+            let value = unsafe { rs.get_unchecked(idx) };
+            let value = match t {
+                mi::ColumnType::Varchar => String::from(value),
+                mi::ColumnType::Int16 => {
+                    let v: i16 = value.into();
+                    v.to_string()
+                }
+                _ => "not-implemented".to_string()
+            };
+            let name = unsafe { self.column_names.get_unchecked(idx) };
+            results.push(format!("{}={}", name, value));
+        }
+
+        format!("{{ {} }}", results.join(","))
     }
 }
 
