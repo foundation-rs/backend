@@ -1,10 +1,10 @@
 use std::sync::Arc;
 use actix_web::{get, web, Scope, Responder, HttpResponse};
 
+use oracle::{self, ValueProjector};
+
 use crate::application::ApplicationState;
 use crate::metainfo as mi;
-use oracle;
-use crate::metainfo::{TableInfo, PrimaryKey};
 
 // group of endpoints for api
 pub fn api_scope() -> Scope {
@@ -36,11 +36,14 @@ async fn table_query_by_pk(path: web::Path<(String,String,String)>, data: web::D
 struct DynamicQuery {
     table_name:    String,
     column_names:  Vec<String>,
-    column_types:  Vec<oracle::TypeDescriptor>,
+    column_types:  Vec<mi::ColumnType>,
+    column_type_descriptors:  Vec<oracle::TypeDescriptor>,
     param_columns: Vec<usize>
 }
 
 impl DynamicQuery {
+    // TODO: check validity of query, pk must be int or String
+    // TODO: if pk is int, try parse String to int
     pub fn new(schema_name: &str, table_info: &mi::TableInfo, pk: &mi::PrimaryKey) -> DynamicQuery {
         let table_name = format!("{}.{}", schema_name, table_info.name.as_str());
 
@@ -49,18 +52,20 @@ impl DynamicQuery {
         let columns_count = table_info.columns.len();
         let mut column_names = Vec::with_capacity(columns_count);
         let mut column_types = Vec::with_capacity(columns_count);
+        let mut column_type_descriptors = Vec::with_capacity(columns_count);
         let mut param_columns = Vec::new();
 
         for i in 0..columns_count {
             let column = unsafe { table_info.columns.get_unchecked(i) };
             column_names.push(column.name.clone());
-            column_types.push(oracle::TypeDescriptor::new(column.oci_data_type, column.buffer_len));
+            column_types.push(column.col_type);
+            column_type_descriptors.push(oracle::TypeDescriptor::new(column.oci_data_type, column.buffer_len));
             if &column.name == pk_coloumn_name {
                 param_columns.push(i);
             }
         }
 
-        DynamicQuery { table_name, column_names, column_types, param_columns }
+        DynamicQuery { table_name, column_names, column_types, column_type_descriptors, param_columns }
     }
 
     pub fn generate_sql(&self) -> String {
@@ -86,7 +91,7 @@ impl DynamicQuery {
 
 impl oracle::ResultsProvider<DynamicQuery> for DynamicQuery {
     fn sql_descriptors(&self) -> Vec<oracle::TypeDescriptor> {
-        self.column_types.clone()
+        self.column_type_descriptors.clone()
     }
 
     fn gen_result(&self, rs: oracle::ResultSet) -> DynamicQuery {
@@ -94,18 +99,41 @@ impl oracle::ResultsProvider<DynamicQuery> for DynamicQuery {
     }
 }
 
-impl oracle::ParamsProvider<DynamicQuery> for DynamicQuery {
+// TODO: may be type of params must be Special Struct with checked and parsed value, may be union
+
+impl oracle::ParamsProvider<String> for DynamicQuery {
     fn members(&self) -> Vec<oracle::Member> {
         self.param_columns.iter()
             .map(|idx| {
-                let td = unsafe { self.column_types(*idx) }.clone();
+                let td = unsafe { self.column_type_descriptors.get_unchecked(*idx) }.clone();
                 oracle::Member::new(td, oracle::Identifier::Unnamed)
             })
             .collect()
     }
 
-    fn project_values(&self, params: &DynamicQuery, projecton: &mut oracle::ParamsProjection) {
-        unimplemented!()
+    // currently, string representation of primary key
+    fn project_values(&self, params: &String, projecton: &mut oracle::ParamsProjection) {
+        let param_column_idx = unsafe { self.param_columns.get_unchecked(0) };
+        let param_column_type = unsafe { self.column_types.get_unchecked(*param_column_idx) };
+
+        let p = unsafe { projecton.get_unchecked_mut(0) };
+
+        match param_column_type {
+            mi::ColumnType::Int16 => {
+                let val: i16 = params.parse().unwrap();
+                val.project_value(p);
+            },
+            mi::ColumnType::Int32 => {
+                let val: i32 = params.parse().unwrap();
+                val.project_value(p);
+            },
+            mi::ColumnType::Int64 => {
+                let val: i64 = params.parse().unwrap();
+                val.project_value(p);
+            },
+            mi::ColumnType::Varchar => &params.project_value(p),
+            _ => {}
+        };
     }
 }
 

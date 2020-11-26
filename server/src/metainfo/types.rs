@@ -87,7 +87,7 @@ impl Borrow<str> for TableInfo {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ColumnType {
     Int16, Int32, Int64, Float64, Varchar, DateTime, Blob, Clob, Long, Unsupported
 }
