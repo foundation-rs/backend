@@ -58,6 +58,11 @@ mod constants {
     pub const SQLT_BOL: u16 = 252;
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum ColumnType {
+    Int16, Int32, Int64, Float64, Varchar, DateTime, Blob, Clob, Long, Unsupported
+}
+
 /// incapsulate Oracle SQL Types
 #[derive(Debug, Clone, Copy)]
 pub struct TypeDescriptor {
@@ -72,6 +77,23 @@ impl TypeDescriptor {
 
     pub const fn new(dtype: u16, size: usize) -> TypeDescriptor {
         TypeDescriptor { dtype, size }
+    }
+}
+
+impl TryFrom<(ColumnType, usize)> for TypeDescriptor {
+    type Error = String;
+
+    fn try_from(value: (ColumnType, usize)) -> Result<Self, Self::Error> {
+        match value.0 {
+            ColumnType::Int16 => Ok(I16_SQLTYPE),
+            ColumnType::Int32 => Ok(I32_SQLTYPE),
+            ColumnType::Int64 => Ok(I64_SQLTYPE),
+            ColumnType::Float64 => Ok(F64_SQLTYPE),
+            ColumnType::DateTime => Ok(DATETIME_SQLTYPE),
+            ColumnType::Long => Ok(string_sqltype(4000)),
+            ColumnType::Varchar => Ok(string_sqltype(value.1)),
+            _ => Err("Unsupported SQL type")
+        }
     }
 }
 
@@ -162,6 +184,7 @@ impl TypeDescriptorProducer<&str> for &str {
 
 // all about dates
 use chrono::prelude::*;
+use std::convert::TryFrom;
 
 // Date and Datetime
 
