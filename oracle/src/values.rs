@@ -204,7 +204,7 @@ fn datetime_from_row(valp: *const u8, len: u16) -> DateTime<Local> {
     let mm = vec[5] as u32;
     let ss = vec[6] as u32;
 
-    Local.ymd(y, m, d).and_hms(hh, mm, ss)
+    Local.ymd(y, m, d).and_hms(hh - 1, mm - 1, ss - 1)
 }
 
 fn datetime_to_row(source: &DateTime<Local>, data: *mut u8) -> usize {
@@ -215,9 +215,9 @@ fn datetime_to_row(source: &DateTime<Local>, data: *mut u8) -> usize {
         *data.offset(1) = year;
         *data.offset(2) = source.month() as u8;
         *data.offset(3) = source.day() as u8;
-        *data.offset(4) = source.hour() as u8;    // may be need + 1?
-        *data.offset(5) = source.minute() as u8;  // may be need + 1?
-        *data.offset(6) = source.second() as u8;  // may be need + 1?
+        *data.offset(4) = source.hour() as u8 + 1;
+        *data.offset(5) = source.minute() as u8 + 1;
+        *data.offset(6) = source.second() as u8 + 1;
         0
     }
 }

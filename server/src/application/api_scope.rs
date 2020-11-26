@@ -4,8 +4,9 @@ use actix_web::{get, web, Scope, Responder, HttpResponse};
 use oracle::{self, ValueProjector};
 
 use crate::application::ApplicationState;
-use crate::metainfo as mi;
+use crate::{metainfo as mi, datasource};
 use std::ffi::OsString;
+use actix_web::http::header::ContentType;
 
 // group of endpoints for api
 pub fn api_scope() -> Scope {
@@ -23,8 +24,11 @@ async fn table_query_by_pk(path: web::Path<(String,String,String)>, data: web::D
             return match &info.primary_key {
                 Some(pk) if pk.columns.len() == 1 => {
                     let query = DynamicQuery::new(&info.name, info, pk);
-                    let select = query.generate_sql();
-                    HttpResponse::Ok().body(select)
+                    let result = query.execute_query(primary_key);
+                    match result {
+                        Ok(r) => HttpResponse::Ok().set(ContentType::json()).body(r),
+                        Err(err) => HttpResponse::InternalServerError().body(err)
+                    }
                 },
                 _ => HttpResponse::BadRequest().finish()
             };
@@ -85,8 +89,21 @@ impl DynamicQuery {
     }
 
     /// execyte a query and generate JSON result
-    pub fn execute_query(&mut self) -> String {
-        unimplemented!()
+    pub fn execute_query(self, pk: String) -> Result<String,String> {
+        let conn = datasource::get_connection()
+            .map_err(|err|format!("Can not connect to oracle: {}", err))?;
+
+        let sql = self.generate_sql();
+        let stmt = conn.prepare(&sql)
+            .map_err(|err|format!("Can not prepare statement: {}", err))?;
+
+        let query = stmt.query_dynamic(Box::new(self), 1)
+            .map_err(|err|format!("Can not create query from statement: {}", err))?;
+
+        let result = query.fetch_one(pk)
+            .map_err(|err|format!("Can not fetch row by pk: {}", err))?;
+
+        Ok( format!("[{}]", result) )
     }
 }
 
@@ -99,17 +116,38 @@ impl oracle::ResultsProvider<String> for DynamicQuery {
         let mut results = Vec::with_capacity(self.column_names.len());
 
         for (idx,t) in self.column_types.iter().enumerate() {
-            let value = unsafe { rs.get_unchecked(idx) };
+            // println!("col {} has type {:?}", idx, t);
+
+            let value = unsafe { rs.get_unchecked(idx) }.to_owned();
             let value = match t {
-                mi::ColumnType::Varchar => String::from(value),
+                mi::ColumnType::Varchar => {
+                    let v: String = value.into();
+                    format!("\"{}\"",v)
+                },
                 mi::ColumnType::Int16 => {
                     let v: i16 = value.into();
                     v.to_string()
+                },
+                mi::ColumnType::Int32 => {
+                    let v: i32 = value.into();
+                    v.to_string()
+                },
+                mi::ColumnType::Int64 => {
+                    let v: i64 = value.into();
+                    v.to_string()
+                },
+                mi::ColumnType::Float64 => {
+                    let v: f64 = value.into();
+                    v.to_string()
+                },
+                mi::ColumnType::DateTime => {
+                    let v: oracle::SqlDateTime = value.into();
+                    format!("\"{}\"", v.to_rfc3339())
                 }
-                _ => "not-implemented".to_string()
+                _ => "\"not-implemented\"".to_string()
             };
             let name = unsafe { self.column_names.get_unchecked(idx) };
-            results.push(format!("{}={}", name, value));
+            results.push(format!("\"{}\":{}", name, value));
         }
 
         format!("{{ {} }}", results.join(","))
@@ -148,7 +186,9 @@ impl oracle::ParamsProvider<String> for DynamicQuery {
                 let val: i64 = params.parse().unwrap();
                 val.project_value(p);
             },
-            mi::ColumnType::Varchar => &params.project_value(p),
+            mi::ColumnType::Varchar => {
+                &params.project_value(p);
+            },
             _ => {}
         };
     }

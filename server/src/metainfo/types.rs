@@ -149,7 +149,7 @@ impl From<OraTableColumn> for ColumnInfo {
                 },
                 "DATE" => {
                     // SQLT_DAT
-                    (ColumnType::DateTime, 1, 12)
+                    (ColumnType::DateTime, 12, 7)
                 },
                 "CLOB" => {
                     // SQLT_CLOB
@@ -165,18 +165,18 @@ impl From<OraTableColumn> for ColumnInfo {
                             if data_precision == 0 {
                                 col_type_name = "INTEGER".to_string();
                             }
-                            // SQLT_NUM
-                            (ColumnType::Int64, 2, size_of::<i64>())
+                            // SQLT_INT
+                            (ColumnType::Int64, 3, size_of::<i64>())
                         } else if data_precision > 4 {
-                            // SQLT_NUM
-                            (ColumnType::Int32, 2, size_of::<i32>())
+                            // SQLT_INT
+                            (ColumnType::Int32, 3, size_of::<i32>())
                         } else {
-                            // SQLT_NUM
-                            (ColumnType::Int16, 2, size_of::<i16>())
+                            // SQLT_INT
+                            (ColumnType::Int16, 3, size_of::<i16>())
                         }
                     } else {
-                        // SQLT_NUM
-                        (ColumnType::Float64, 2, size_of::<f64>())
+                        // SQLT_FLT
+                        (ColumnType::Float64, 4, size_of::<f64>())
                     }
                 },
                 _ => {
