@@ -80,7 +80,6 @@ impl DynamicQuery {
 }
 
 impl oracle::ResultsProvider<DynamicQuery> for DynamicQuery {
-
     fn sql_descriptors(&self) -> Vec<oracle::TypeDescriptor> {
         self.column_types.clone()
     }
