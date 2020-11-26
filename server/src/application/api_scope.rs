@@ -77,6 +77,11 @@ impl DynamicQuery {
         };
         format!("SELECT {} FROM {} WHERE {}", joined_result_columns, self.table_name, where_clause)
     }
+
+    /// execyte a query and generate JSON result
+    pub fn execute_query(&mut self) -> String {
+        unimplemented!()
+    }
 }
 
 impl oracle::ResultsProvider<DynamicQuery> for DynamicQuery {
@@ -91,7 +96,12 @@ impl oracle::ResultsProvider<DynamicQuery> for DynamicQuery {
 
 impl oracle::ParamsProvider<DynamicQuery> for DynamicQuery {
     fn members(&self) -> Vec<oracle::Member> {
-        unimplemented!()
+        self.param_columns.iter()
+            .map(|idx| {
+                let td = unsafe { self.column_types(*idx) }.clone();
+                oracle::Member::new(td, oracle::Identifier::Unnamed)
+            })
+            .collect()
     }
 
     fn project_values(&self, params: &DynamicQuery, projecton: &mut oracle::ParamsProjection) {
