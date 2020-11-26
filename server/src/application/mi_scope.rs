@@ -1,5 +1,7 @@
 use std::sync::Arc;
-use actix_web::{Scope, web, Responder, HttpResponse};
+use actix_web::{get, web, Scope, Responder, HttpResponse};
+use serde::Serialize;
+
 use crate::application::ApplicationState;
 
 // group of endpoints for metainfo

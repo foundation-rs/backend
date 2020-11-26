@@ -59,7 +59,7 @@ mod constants {
 }
 
 /// incapsulate Oracle SQL Types
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct TypeDescriptor {
     pub(crate) dtype: u16,
     pub(crate) size:  usize
@@ -70,7 +70,7 @@ impl TypeDescriptor {
         TypeDescriptor { dtype, size: size_of::<T>()}
     }
 
-    const fn new(dtype: u16, size: usize) -> TypeDescriptor {
+    pub const fn new(dtype: u16, size: usize) -> TypeDescriptor {
         TypeDescriptor { dtype, size }
     }
 }

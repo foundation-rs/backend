@@ -12,7 +12,7 @@ use std::io::{Error, ErrorKind, Result};
 
 use actix_web::{get, web, HttpResponse, Responder, Scope, HttpRequest};
 use actix_files as fs;
-use serde::{Serialize};
+use serde::Serialize;
 
 use crate::config::Config;
 use crate::metainfo::{self, MetaInfo};
