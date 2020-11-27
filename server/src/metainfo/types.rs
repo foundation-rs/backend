@@ -101,7 +101,7 @@ pub struct ColumnInfo {
 #[derive(Debug)]
 pub struct PrimaryKey {
     pub name:    String,
-    pub columns: Vec<String>
+    pub column_indices: Vec<usize>
 }
 
 #[derive(Debug)]
@@ -113,7 +113,7 @@ pub struct TableIndex {
 
 #[derive(Debug)]
 pub struct IndexColumn {
-    pub name: String,
+    pub column_index: usize,
     pub desc: bool
 }
 

@@ -154,9 +154,17 @@ impl MetaInfo {
                 for ((table_name, name), key_columns) in grouped_keys.into_iter() {
                     let table_info = schema.tables.get(table_name.to_lowercase().as_str());
                     if let Some(table_info) = table_info {
-                        let columns = key_columns.map(|c|c.column_name.to_lowercase()).collect();
+                        let column_indices: Vec<usize> = key_columns
+                            .map(|c|{
+                                let column_name = c.column_name.to_lowercase();
+                                table_info.columns.iter().position(|c|c.name == column_name)
+                            })
+                            .filter_map(|p|p)
+                            .collect();
 
-                        table_info.set_primary_key(PrimaryKey { name, columns});
+                        if column_indices.len() > 0 {
+                            table_info.set_primary_key(PrimaryKey { name, column_indices});
+                        }
                     } // table info found
                 }
             } // schema found
@@ -187,10 +195,21 @@ impl MetaInfo {
                         let indexes = indexes.group_by(|t|(t.index_name.clone(), t.uniqueness.clone()));
 
                         for ((index_name, uniqueness), columns) in indexes.into_iter() {
-                            let columns = columns.map(|c| IndexColumn{name: c.column_name.to_lowercase(), desc: c.descend != "ACC"}).collect();
-                            let index = TableIndex {name: index_name, unique: uniqueness == "UNIQUE", columns};
+                            let columns: Vec<IndexColumn> = columns.map(|c| {
+                                let column_name = c.column_name.to_lowercase();
+                                table_info
+                                    .columns
+                                    .iter()
+                                    .position(|c|c.name == column_name)
+                                    .map(|column_index| IndexColumn{column_index, desc: c.descend != "ACC"} )
+                            })
+                                .filter_map(|p|p)
+                                .collect();
 
-                            table_info.push_table_index(index);
+                            if columns.len() > 0 {
+                                let index = TableIndex {name: index_name, unique: uniqueness == "UNIQUE", columns};
+                                table_info.push_table_index(index);
+                            }
                         }
                     } // table info found
                 }

@@ -22,7 +22,7 @@ async fn table_query_by_pk(path: web::Path<(String,String,String)>, data: web::D
     if let Some(info) = metainfo.schemas.get(schema_name.as_str()) {
         if let Some(info) = info.tables.get(table_name.as_str()) {
             return match &info.primary_key {
-                Some(pk) if pk.columns.len() == 1 => {
+                Some(pk) if pk.column_indices.len() == 1 => {
                     let query = DynamicQuery::new(&schema_name, info, pk);
                     let result = query.execute_query(primary_key);
                     match result {
@@ -52,22 +52,19 @@ impl DynamicQuery {
     pub fn new(schema_name: &str, table_info: &mi::TableInfo, pk: &mi::PrimaryKey) -> DynamicQuery {
         let table_name = format!("{}.{}", schema_name, table_info.name.as_str());
 
-        let pk_coloumn_name = unsafe { pk.columns.get_unchecked(0) };
+        let pk_coloumn_name = unsafe { pk.column_indices.get_unchecked(0) };
 
         let columns_count = table_info.columns.len();
         let mut column_names = Vec::with_capacity(columns_count);
         let mut column_types = Vec::with_capacity(columns_count);
         let mut column_type_descriptors = Vec::with_capacity(columns_count);
-        let mut param_columns = Vec::new();
+        let mut param_columns = pk.column_indices.clone();
 
         for i in 0..columns_count {
             let column = unsafe { table_info.columns.get_unchecked(i) };
             column_names.push(column.name.clone());
             column_types.push(column.col_type);
             column_type_descriptors.push(column.oci_data_type);
-            if &column.name == pk_coloumn_name {
-                param_columns.push(i);
-            }
         }
 
         DynamicQuery { table_name, column_names, column_types, column_type_descriptors, param_columns }
