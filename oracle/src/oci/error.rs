@@ -11,6 +11,7 @@ use crate::oci::bindings::*;
 #[allow(non_snake_case)]
 #[allow(non_camel_case_types)]
 use crate::oci::constants::*;
+use std::ffi::CStr;
 
 /// Represents Oracle error
 #[derive(Debug, Clone)]
@@ -48,7 +49,8 @@ impl error::Error for OracleError {
 #[inline]
 fn error_get(errhp: *mut OCIError, location: &'static str) -> OracleError {
     let errc: *mut i32 = &mut 0;
-    let mut buf = String::with_capacity(2048);
+
+    let mut buf: Vec<u8> = Vec::with_capacity(4096);
     unsafe {
         OCIErrorGet(
             errhp as *mut c_void,
@@ -60,7 +62,12 @@ fn error_get(errhp: *mut OCIError, location: &'static str) -> OracleError {
             OCI_HTYPE_ERROR
         )
     };
-    OracleError { errcode: unsafe{ *errc }, message: buf, location }
+
+    let c_str: &CStr = unsafe { CStr::from_ptr(buf.as_ptr() as *const i8) };
+    let str_slice: &str = c_str.to_str().unwrap();
+    let message: String = str_slice.to_owned();
+
+    OracleError { errcode: unsafe{ *errc }, message, location }
 }
 
 /// check errcode for Oracle Error

@@ -5,8 +5,8 @@ use oracle::{self, ValueProjector};
 
 use crate::application::ApplicationState;
 use crate::{metainfo as mi, datasource};
-use std::ffi::OsString;
 use actix_web::http::header::ContentType;
+use std::convert::TryFrom;
 
 // group of endpoints for api
 pub fn api_scope() -> Scope {
@@ -14,16 +14,16 @@ pub fn api_scope() -> Scope {
         .service(table_query_by_pk)
 }
 
-#[get("/{schema}/{table}/{pk}")]
+#[get("/schemas/{schema}/{table}/{pk}")]
 async fn table_query_by_pk(path: web::Path<(String,String,String)>, data: web::Data<Arc<ApplicationState>>) -> impl Responder {
     let (schema_name,table_name, primary_key) = path.into_inner();
     let metainfo = data.metainfo.read().unwrap();
 
-    if let Some(info) = metainfo.schemas.get(schema_name.to_uppercase().as_str()) {
-        if let Some(info) = info.tables.get(table_name.to_uppercase().as_str()) {
+    if let Some(info) = metainfo.schemas.get(schema_name.as_str()) {
+        if let Some(info) = info.tables.get(table_name.as_str()) {
             return match &info.primary_key {
                 Some(pk) if pk.columns.len() == 1 => {
-                    let query = DynamicQuery::new(&info.name, info, pk);
+                    let query = DynamicQuery::new(&schema_name, info, pk);
                     let result = query.execute_query(primary_key);
                     match result {
                         Ok(r) => HttpResponse::Ok().set(ContentType::json()).body(r),
@@ -41,7 +41,7 @@ async fn table_query_by_pk(path: web::Path<(String,String,String)>, data: web::D
 struct DynamicQuery {
     table_name:    String,
     column_names:  Vec<String>,
-    column_types:  Vec<mi::ColumnType>,
+    column_types:  Vec<oracle::SqlType>,
     column_type_descriptors:  Vec<oracle::TypeDescriptor>,
     param_columns: Vec<usize>
 }
@@ -64,7 +64,7 @@ impl DynamicQuery {
             let column = unsafe { table_info.columns.get_unchecked(i) };
             column_names.push(column.name.clone());
             column_types.push(column.col_type);
-            column_type_descriptors.push(oracle::TypeDescriptor::new(column.oci_data_type, column.buffer_len));
+            column_type_descriptors.push(column.oci_data_type);
             if &column.name == pk_coloumn_name {
                 param_columns.push(i);
             }
@@ -94,6 +94,9 @@ impl DynamicQuery {
             .map_err(|err|format!("Can not connect to oracle: {}", err))?;
 
         let sql = self.generate_sql();
+
+        println!("DynamicQuery.execute_query,sql: {}", &sql);
+
         let stmt = conn.prepare(&sql)
             .map_err(|err|format!("Can not prepare statement: {}", err))?;
 
@@ -113,42 +116,14 @@ impl oracle::ResultsProvider<String> for DynamicQuery {
     }
 
     fn gen_result(&self, rs: oracle::ResultSet) -> String {
-        let mut results = Vec::with_capacity(self.column_names.len());
-
-        for (idx,t) in self.column_types.iter().enumerate() {
-            // println!("col {} has type {:?}", idx, t);
-
-            let value = unsafe { rs.get_unchecked(idx) }.to_owned();
-            let value = match t {
-                mi::ColumnType::Varchar => {
-                    let v: String = value.into();
-                    format!("\"{}\"",v)
-                },
-                mi::ColumnType::Int16 => {
-                    let v: i16 = value.into();
-                    v.to_string()
-                },
-                mi::ColumnType::Int32 => {
-                    let v: i32 = value.into();
-                    v.to_string()
-                },
-                mi::ColumnType::Int64 => {
-                    let v: i64 = value.into();
-                    v.to_string()
-                },
-                mi::ColumnType::Float64 => {
-                    let v: f64 = value.into();
-                    v.to_string()
-                },
-                mi::ColumnType::DateTime => {
-                    let v: oracle::SqlDateTime = value.into();
-                    format!("\"{}\"", v.to_rfc3339())
-                }
-                _ => "\"not-implemented\"".to_string()
-            };
-            let name = unsafe { self.column_names.get_unchecked(idx) };
-            results.push(format!("\"{}\":{}", name, value));
-        }
+        let results: Vec<String> = self.column_types
+            .iter()
+            .zip(self.column_names.iter())
+            .zip(rs.iter())
+            .map(|((t,name), value)|{
+                let result = value.to_owned().try_to_string(t).unwrap_or_else(|err| err.to_string());
+                format!("\"{}\":{}", name, result)
+            }).collect();
 
         format!("{{ {} }}", results.join(","))
     }
@@ -174,19 +149,19 @@ impl oracle::ParamsProvider<String> for DynamicQuery {
         let p = unsafe { projecton.get_unchecked_mut(0) };
 
         match param_column_type {
-            mi::ColumnType::Int16 => {
+            oracle::SqlType::Int16 => {
                 let val: i16 = params.parse().unwrap();
                 val.project_value(p);
             },
-            mi::ColumnType::Int32 => {
+            oracle::SqlType::Int32 => {
                 let val: i32 = params.parse().unwrap();
                 val.project_value(p);
             },
-            mi::ColumnType::Int64 => {
+            oracle::SqlType::Int64 => {
                 let val: i64 = params.parse().unwrap();
                 val.project_value(p);
             },
-            mi::ColumnType::Varchar => {
+            oracle::SqlType::Varchar => {
                 &params.project_value(p);
             },
             _ => {}

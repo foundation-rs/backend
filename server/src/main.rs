@@ -14,6 +14,14 @@ mod utils;
 
 // TODO: threadlocal: https://doc.rust-lang.org/std/macro.thread_local.html
 
+// rest api structure:
+//   /healt         health checking
+//   /mgmt          management
+//       /schemas   metadata-catalog
+//   /api           web applications api
+//       /schemas   tables / views / procedures
+//   /              static files / web-server
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let log = setup::logging();
@@ -38,7 +46,7 @@ async fn main() -> std::io::Result<()> {
             .wrap(StructuredLogger::new(log.clone()))
             .wrap(middleware::Compress::new(ContentEncoding::Br))
 
-            .service(application::metainfo_scope())
+            .service(application::management_scope())
             .service(application::api_scope())
             .service( application::base_scope())
     })

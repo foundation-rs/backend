@@ -5,8 +5,8 @@ use serde::Serialize;
 use crate::application::ApplicationState;
 
 // group of endpoints for metainfo
-pub fn metainfo_scope() -> Scope {
-    web::scope("/metainfo")
+pub fn management_scope() -> Scope {
+    web::scope("/mgmt")
         .service(schemas_metainfo)
         .service(tables_metainfo)
         .service(table_metainfo)
@@ -46,7 +46,7 @@ pub struct ColumnMetaInfo<'a> {
     pub nullable: bool
 }
 
-#[get("/")]
+#[get("/schemas")]
 async fn schemas_metainfo(data: web::Data<Arc<ApplicationState>>) -> impl Responder {
     let metainfo = data.metainfo.read().unwrap();
     let mut schemas: Vec<&str> = metainfo.schemas.iter().map(|s|s.name.as_str()).collect();
@@ -55,12 +55,12 @@ async fn schemas_metainfo(data: web::Data<Arc<ApplicationState>>) -> impl Respon
     HttpResponse::Ok().json(response)
 }
 
-#[get("/{schema}")]
+#[get("/schemas/{schema}")]
 async fn tables_metainfo(path: web::Path<(String,)>, data: web::Data<Arc<ApplicationState>>) -> impl Responder {
     let schema_name = path.into_inner().0;
     let metainfo = data.metainfo.read().unwrap();
 
-    match metainfo.schemas.get(schema_name.to_uppercase().as_str()) {
+    match metainfo.schemas.get(schema_name.as_str()) {
         Some(info) => {
             let mut tables: Vec<TableMetaInfoBrief> = info.tables.iter().map(|info|
                 TableMetaInfoBrief {
@@ -77,13 +77,13 @@ async fn tables_metainfo(path: web::Path<(String,)>, data: web::Data<Arc<Applica
     }
 }
 
-#[get("/{schema}/{table}")]
+#[get("/schemas/{schema}/{table}")]
 async fn table_metainfo(path: web::Path<(String,String)>, data: web::Data<Arc<ApplicationState>>) -> impl Responder {
     let (schema_name,table_name) = path.into_inner();
     let metainfo = data.metainfo.read().unwrap();
 
-    if let Some(info) = metainfo.schemas.get(schema_name.to_uppercase().as_str()) {
-        if let Some(info) = info.tables.get(table_name.to_uppercase().as_str()) {
+    if let Some(info) = metainfo.schemas.get(schema_name.as_str()) {
+        if let Some(info) = info.tables.get(table_name.as_str()) {
             let columns = info
                 .columns
                 .iter()

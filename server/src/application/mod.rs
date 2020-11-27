@@ -1,4 +1,4 @@
-mod mi_scope;
+mod mgmt_scope;
 mod api_scope;
 
 use std::sync::{Arc, RwLock};
@@ -18,7 +18,7 @@ use crate::metainfo::{self, MetaInfo};
 use actix_files::NamedFile;
 use std::path::PathBuf;
 
-pub use mi_scope::metainfo_scope;
+pub use mgmt_scope::management_scope;
 pub use api_scope::api_scope;
 
 // This struct represents state

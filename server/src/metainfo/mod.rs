@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::convert::TryFrom;
 use itertools::Itertools;
 
 use oracle;
@@ -113,20 +114,20 @@ impl MetaInfo {
 
             for (table,columns) in joined {
                 // construct table info and push it to tables map
-                let name = table.table_name;
+                let name = table.table_name.to_lowercase();
                 let num_rows = table.num_rows;
 
                 let is_view = table.table_type == "VIEW";
                 let temporary = table.temporary == "Y";
 
                 // construct column info and collect it to vector of columns
-                let columns = columns.map(|c|c.into()).collect();
+                let columns = columns.map(|c|ColumnInfo::try_from(c)).filter_map(|c|c.ok()).collect();
 
                 let table = TableInfo { name, is_view, temporary, num_rows, columns, primary_key: None, indexes: Vec::new() };
                 tables.insert(table);
             }
 
-            let schema = SchemaInfo { name: schema, tables};
+            let schema = SchemaInfo { name: schema.to_lowercase(), tables};
 
             result.insert(schema);
         };
@@ -143,7 +144,7 @@ impl MetaInfo {
             .group_by(|t| t.owner.clone() );
 
         for (schema, keys) in grouped_keys.into_iter() {
-            let schema = schemas.get(schema.as_str());
+            let schema = schemas.get(schema.to_lowercase().as_str());
 
             if let Some(schema) = schema {
                 // group keys by table name and constraint name
@@ -151,9 +152,9 @@ impl MetaInfo {
                     .group_by(|t| (t.table_name.clone(),t.constraint_name.clone()) );
 
                 for ((table_name, name), key_columns) in grouped_keys.into_iter() {
-                    let table_info = schema.tables.get(table_name.as_str());
+                    let table_info = schema.tables.get(table_name.to_lowercase().as_str());
                     if let Some(table_info) = table_info {
-                        let columns = key_columns.map(|c|c.column_name).collect();
+                        let columns = key_columns.map(|c|c.column_name.to_lowercase()).collect();
 
                         table_info.set_primary_key(PrimaryKey { name, columns});
                     } // table info found
@@ -173,7 +174,7 @@ impl MetaInfo {
             .group_by(|t| t.owner.clone() );
 
         for (schema, indexes) in grouped_indexes.into_iter() {
-            let schema = schemas.get(schema.as_str());
+            let schema = schemas.get(schema.to_lowercase().as_str());
 
             if let Some(schema) = schema {
                 // group indexes by table name and index name
@@ -181,12 +182,12 @@ impl MetaInfo {
                     .group_by(|t| t.table_name.clone() );
 
                 for (table_name, indexes) in grouped_indexes.into_iter() {
-                    let table_info = schema.tables.get(table_name.as_str());
+                    let table_info = schema.tables.get(table_name.to_lowercase().as_str());
                     if let Some(table_info) = table_info {
                         let indexes = indexes.group_by(|t|(t.index_name.clone(), t.uniqueness.clone()));
 
                         for ((index_name, uniqueness), columns) in indexes.into_iter() {
-                            let columns = columns.map(|c| IndexColumn{name: c.column_name, desc: c.descend != "ACC"}).collect();
+                            let columns = columns.map(|c| IndexColumn{name: c.column_name.to_lowercase(), desc: c.descend != "ACC"}).collect();
                             let index = TableIndex {name: index_name, unique: uniqueness == "UNIQUE", columns};
 
                             table_info.push_table_index(index);

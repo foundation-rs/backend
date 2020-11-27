@@ -10,9 +10,10 @@ pub use oci::{OracleError, OracleResult};
 pub use connection::{Connection, SessionPool, create_pool};
 
 pub use types::{
+    SqlType,
+    SqlDate, SqlDateTime,
     TypeDescriptor,
-    TypeDescriptorProducer,
-    SqlDate, SqlDateTime
+    TypeDescriptorProducer
 };
 
 pub use statement::{

@@ -3,6 +3,7 @@ use std::ptr;
 
 use crate::statement::{ParamValue, ResultValue};
 use crate::ValueProjector;
+use crate::SqlType;
 
 // integer types, must be used only for primitive types
 // TODO: optional types (ValueProjector)
@@ -221,4 +222,40 @@ fn datetime_to_row(source: &DateTime<Local>, data: *mut u8) -> usize {
         0
     }
 }
+
+use std::convert::TryFrom;
+
+impl ResultValue {
+    pub fn try_to_string(self, tp: &SqlType) -> Result<String, &'static str> {
+        let result = match tp {
+            SqlType::Varchar => {
+                let v: String = self.into();
+                format!("\"{}\"",v)
+            },
+            SqlType::Int16 => {
+                let v: i16 = self.into();
+                v.to_string()
+            },
+            SqlType::Int32 => {
+                let v: i32 = self.into();
+                v.to_string()
+            },
+            SqlType::Int64 => {
+                let v: i64 = self.into();
+                v.to_string()
+            },
+            SqlType::Float64 => {
+                let v: f64 = self.into();
+                v.to_string()
+            },
+            SqlType::DateTime => {
+                let v: SqlDateTime = self.into();
+                format!("\"{}\"", v.to_rfc3339())
+            }
+            _ => return Err("\"not-implemented\"")
+        };
+        Ok(result)
+    }
+}
+
 

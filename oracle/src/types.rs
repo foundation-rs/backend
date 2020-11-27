@@ -59,7 +59,7 @@ mod constants {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub enum ColumnType {
+pub enum SqlType {
     Int16, Int32, Int64, Float64, Varchar, DateTime, Blob, Clob, Long, Unsupported
 }
 
@@ -80,19 +80,32 @@ impl TypeDescriptor {
     }
 }
 
-impl TryFrom<(ColumnType, usize)> for TypeDescriptor {
-    type Error = String;
-
-    fn try_from(value: (ColumnType, usize)) -> Result<Self, Self::Error> {
+impl From<(SqlType, usize)> for TypeDescriptor {
+    fn from(value: (SqlType, usize)) -> Self {
         match value.0 {
-            ColumnType::Int16 => Ok(I16_SQLTYPE),
-            ColumnType::Int32 => Ok(I32_SQLTYPE),
-            ColumnType::Int64 => Ok(I64_SQLTYPE),
-            ColumnType::Float64 => Ok(F64_SQLTYPE),
-            ColumnType::DateTime => Ok(DATETIME_SQLTYPE),
-            ColumnType::Long => Ok(string_sqltype(4000)),
-            ColumnType::Varchar => Ok(string_sqltype(value.1)),
-            _ => Err("Unsupported SQL type")
+            SqlType::Int16 => I16_SQLTYPE,
+            SqlType::Int32 => I32_SQLTYPE,
+            SqlType::Int64 => I64_SQLTYPE,
+            SqlType::Float64 => F64_SQLTYPE,
+            SqlType::DateTime => DATETIME_SQLTYPE,
+            SqlType::Long => string_sqltype(4000),
+            SqlType::Varchar => string_sqltype(value.1),
+            _ => panic!("Unsupported SQL type!")
+        }
+    }
+}
+
+impl From<SqlType> for TypeDescriptor {
+    fn from(value: SqlType) -> Self {
+        match value {
+            SqlType::Int16 => I16_SQLTYPE,
+            SqlType::Int32 => I32_SQLTYPE,
+            SqlType::Int64 => I64_SQLTYPE,
+            SqlType::Float64 => F64_SQLTYPE,
+            SqlType::DateTime => DATETIME_SQLTYPE,
+            SqlType::Long => string_sqltype(4000),
+            SqlType::Varchar => string_sqltype(128),
+            _ => panic!("Unsupported SQL type!")
         }
     }
 }

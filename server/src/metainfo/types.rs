@@ -1,8 +1,10 @@
 use std::borrow::Borrow;
 use std::collections::HashSet;
+use std::convert::TryFrom;
 use std::hash::{Hash, Hasher};
 
 use super::ora_source::*;
+use oracle::{self, SqlType};
 
 pub struct MetaInfo {
     pub schemas:  HashSet<SchemaInfo>,
@@ -87,22 +89,13 @@ impl Borrow<str> for TableInfo {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum ColumnType {
-    Int16, Int32, Int64, Float64, Varchar, DateTime, Blob, Clob, Long, Unsupported
-}
-
 #[derive(Debug)]
 pub struct ColumnInfo {
     pub name:           String,
-    pub col_type:       ColumnType,
-    pub col_type_name:  String,
-    pub oci_data_type:  u16,
-    pub col_len:        u16,
-    pub nullable:       bool,
-    pub data_precision: u16,
-    pub data_scale:     u16,
-    pub buffer_len:     usize
+    pub col_type:       SqlType,
+    pub oci_data_type:  oracle::TypeDescriptor,
+    pub col_type_name:  String, // type name in typescript
+    pub nullable:       bool
 }
 
 #[derive(Debug)]
@@ -124,68 +117,61 @@ pub struct IndexColumn {
     pub desc: bool
 }
 
-impl From<OraTableColumn> for ColumnInfo {
-    fn from(v: OraTableColumn) -> ColumnInfo {
-        use std::mem::size_of;
+impl TryFrom<OraTableColumn> for ColumnInfo {
+    type Error = &'static str;
 
-        let name = v.column_name;
+    fn try_from(v: OraTableColumn) -> Result<Self, Self::Error> {
+        let name = v.column_name.to_lowercase();
         let nullable = v.nullable == "Y";
+
         let data_scale = v.data_scale;
         let data_precision = v.data_precision;
         let col_len = v.data_length;
+        let ora_type_name = v.data_type.as_str();
 
-        let mut col_type_name = v.data_type;
-
-        let (col_type, oci_data_type, buffer_len) = {
-            let ctn: &str = &col_type_name.clone();
-            match ctn {
+        let (col_type, oci_data_type, col_type_name) = {
+            match ora_type_name {
                 "CHAR" | "VARCHAR2" => {
-                    // SQLT_CHR
-                    (ColumnType::Varchar, 1, col_len as usize)
+                    (SqlType::Varchar, ((SqlType::Varchar, col_len as usize)).into(), "string".to_owned())
                 },
                 "LONG" => {
-                    // SQLT_CHR
-                    (ColumnType::Long, 1, 4000)
+                    (SqlType::Varchar, SqlType::Long.into(), "string".to_owned())
                 },
                 "DATE" => {
-                    // SQLT_DAT
-                    (ColumnType::DateTime, 12, 7)
+                    (SqlType::DateTime, SqlType::DateTime.into(), "string".to_owned())
                 },
+                /*
                 "CLOB" => {
                     // SQLT_CLOB
-                    (ColumnType::Clob, 112, 0)
+                    (SqlType::Clob, 112, 0)
                 },
                 "BLOB" => {
                     // SQLT_BLOB
-                    (ColumnType::Blob, 113, 0)
+                    (SqlType::Blob, 113, 0)
                 },
+                 */
                 "NUMBER" => {
-                    if data_scale == 0 {
-                        if data_precision == 0 || data_precision > 7 {
-                            if data_precision == 0 {
-                                col_type_name = "INTEGER".to_string();
+                    let col_type =
+                        if data_scale == 0 {
+                            if data_precision == 0 || data_precision > 7 {
+                                SqlType::Int64
+                            } else if data_precision > 4 {
+                                SqlType::Int32
+                            } else {
+                                SqlType::Int16
                             }
-                            // SQLT_INT
-                            (ColumnType::Int64, 3, size_of::<i64>())
-                        } else if data_precision > 4 {
-                            // SQLT_INT
-                            (ColumnType::Int32, 3, size_of::<i32>())
                         } else {
-                            // SQLT_INT
-                            (ColumnType::Int16, 3, size_of::<i16>())
-                        }
-                    } else {
-                        // SQLT_FLT
-                        (ColumnType::Float64, 4, size_of::<f64>())
-                    }
+                            SqlType::Float64
+                        };
+                    (col_type, col_type.into(), "number".to_owned())
                 },
                 _ => {
                     // Unsupported
-                    (ColumnType::Unsupported, 0, 0)
+                    return Err("Unsupported SQL type")
                 }
             }
         };
 
-        ColumnInfo { name, col_type, col_type_name, oci_data_type, col_len, nullable, data_precision, data_scale, buffer_len }
+        Ok( ColumnInfo { name, col_type, oci_data_type, col_type_name, nullable } )
     }
 }
