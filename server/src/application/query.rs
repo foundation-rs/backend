@@ -107,8 +107,6 @@ impl DynamicQuery {
         let conn = datasource::get_connection()
             .map_err(|err|format!("Can not connect to oracle: {}", err))?;
 
-        println!("DynamicQuery.execute_query,sql: {}", &self.sql);
-
         let results_provider = Box::new( DynamicResultsProvider { columns: self.columns, column_names: self.column_names } );
         let params_provider = Box::new( DynamicParamsProvider { columns: self.param_columns });
 
