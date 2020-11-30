@@ -58,15 +58,15 @@ impl <'conn,P,R: 'conn> Query<'conn,P,R> {
     }
 
     #[inline]
-    pub fn fetch_one(&self, params: P) -> OracleResult<R> {
+    pub fn fetch_one(&self, params: P) -> OracleResult<Option<R>> {
         assert_eq!(self.prefetch_rows, 1);
 
         self.stmt.set_params(params)?;
         let mut iterator = self.results.fetch_iter()?;
 
         match iterator.next() {
-            Some(v) => v.map(|r|self.provider.gen_result(r)),
-            None => Err(oci::OracleError::new("The request returned no data".to_owned(), "statement.fetch_one"))
+            Some(v) => v.map(|r|Some(self.provider.gen_result(r))),
+            None => Ok(None)
         }
     }
 

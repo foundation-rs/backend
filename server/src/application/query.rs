@@ -55,6 +55,8 @@ impl DynamicQuery {
                 let sql = DynamicQuery::generate_sql(schema_name, table_name, &column_names, &param_column_names);
                 let column_names = column_names.iter().map(|name|name.to_string()).collect();
 
+                println!("sql: {}", &sql);
+
                 ParsedParameter::parse(pk_column.col_type, parameter)
                     .map(|parsed_parameter|DynamicQuery{sql, columns, column_names, param_columns: vec![pk_column], parsed_params: vec![parsed_parameter]})
             }
@@ -94,14 +96,14 @@ impl DynamicQuery {
         let joined_result_columns = column_names.join(",");
 
         let enumerated_param_columns: Vec<String> =
-            param_column_names.iter().enumerate().map(|(idx,name)|format!("{} = {}", name, idx+1)).collect();
+            param_column_names.iter().enumerate().map(|(idx,name)|format!("{} = :{}", name, idx+1)).collect();
         let joined_param_columns = enumerated_param_columns.join(" AND ");
 
         format!("SELECT {} FROM {}.{} WHERE {}", joined_result_columns, schema_name,  table_name, joined_param_columns)
     }
 
     /// execute a query and generate JSON result
-    pub fn execute(self) -> Result<String,String> {
+    pub fn fetch_one(self) -> Result<String,String> {
         let conn = datasource::get_connection()
             .map_err(|err|format!("Can not connect to oracle: {}", err))?;
 
@@ -119,8 +121,32 @@ impl DynamicQuery {
         let result = query.fetch_one(self.parsed_params)
             .map_err(|err|format!("Can not fetch row by pk: {}", err))?;
 
-        Ok( format!("[{}]", result) )
+        Ok( result.map_or("{}".to_string(), |r| format!("{}", r))  )
     }
+
+    /*
+    /// execute a query and generate JSON result
+    pub fn fetch_many(self) -> Result<String,String> {
+        let conn = datasource::get_connection()
+            .map_err(|err|format!("Can not connect to oracle: {}", err))?;
+
+        println!("DynamicQuery.execute_query,sql: {}", &self.sql);
+
+        let results_provider = Box::new( DynamicResultsProvider { columns: self.columns, column_names: self.column_names } );
+        let params_provider = Box::new( DynamicParamsProvider { columns: self.param_columns });
+
+        let stmt = conn.prepare_dynamic(&self.sql, params_provider)
+            .map_err(|err|format!("Can not prepare statement: {}", err))?;
+
+        let query = stmt.query_dynamic(results_provider, 1)
+            .map_err(|err|format!("Can not create query from statement: {}", err))?;
+
+        let result = query.fetch_one(self.parsed_params)
+            .map_err(|err|format!("Can not fetch row by pk: {}", err))?;
+
+        // Ok( format!("[{}]", result) )
+    }
+    */
 }
 
 impl ParsedParameter {

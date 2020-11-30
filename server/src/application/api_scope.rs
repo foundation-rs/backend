@@ -20,7 +20,7 @@ async fn table_query_by_pk(path: web::Path<(String,String,String)>, data: web::D
             let query = query::DynamicQuery::create_from_pk(&schema_name, info, primary_key);
             return match query {
                 Ok(query) => {
-                    let result = query.execute();
+                    let result = query.fetch_one();
                     match result {
                         Ok(r) => HttpResponse::Ok().set(ContentType::json()).body(r),
                         Err(err) => HttpResponse::InternalServerError().body(err)
