@@ -1,5 +1,6 @@
 mod mgmt_scope;
 mod api_scope;
+mod query;
 
 use std::sync::{Arc, RwLock};
 use std::io::{Error, ErrorKind, Result};

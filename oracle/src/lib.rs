@@ -24,6 +24,7 @@ pub use statement::{
     ResultSet,
     ParamsProvider,
     ParamsProjection,
+    ParamValue,
     SQLParams,
     SQLResults
 };
