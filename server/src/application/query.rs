@@ -2,11 +2,13 @@ use oracle::{self, ValueProjector};
 use crate::{metainfo as mi, datasource};
 
 pub struct DynamicQuery {
-    sql:           String,
-    column_names:  Vec<String>,
+    table_name:    String,
     columns:       Vec<ColTypeInfo>,
-    param_columns: Vec<ColTypeInfo>,
-    parsed_params: Vec<ParsedParameter>
+    column_names:  Vec<String>,
+
+    param_columns:      Vec<ColTypeInfo>,
+    param_column_names: Vec<String>,
+    parsed_params:      Vec<ParsedParameter>
 }
 
 struct DynamicResultsProvider {
@@ -45,68 +47,64 @@ impl DynamicQuery {
                 let pk_column_index = unsafe { pk_indices.get_unchecked(0) };
                 let pk_column = unsafe { table_info.columns.get_unchecked(*pk_column_index) };
 
-                let table_name = table_info.name.as_str();
                 let columns: Vec<ColTypeInfo> = table_info.columns.iter().map(ColTypeInfo::new).collect();
-                let column_names = table_info.columns.iter().map(|c|c.name.as_str()).collect();
+                let column_names: Vec<&str> = table_info.columns.iter().map(|c|c.name.as_str()).collect();
 
-                let param_column_names = vec![pk_column.name.as_str()];
+                let param_column_names = vec![pk_column.name.clone()];
                 let pk_column = ColTypeInfo::new( pk_column );
 
-                let sql = DynamicQuery::generate_sql(schema_name, table_name, &column_names, &param_column_names);
+                let table_name = format!("{}.{}", schema_name, table_info.name.as_str());
                 let column_names = column_names.iter().map(|name|name.to_string()).collect();
 
                 ParsedParameter::parse(pk_column.col_type, parameter)
-                    .map(|parsed_parameter|DynamicQuery{sql, columns, column_names, param_columns: vec![pk_column], parsed_params: vec![parsed_parameter]})
+                    .map(|parsed_parameter|DynamicQuery{table_name, columns, column_names, param_columns: vec![pk_column], param_column_names, parsed_params: vec![parsed_parameter]})
             }
         }
     }
 
     pub fn create_from_params(schema_name: &str, table_info: &mi::TableInfo, parameters: Vec<(String,String)>) -> Result<DynamicQuery, String> {
-        let table_name = table_info.name.as_str();
         let columns: Vec<ColTypeInfo> = table_info.columns.iter().map(ColTypeInfo::new).collect();
-        let column_names = table_info.columns.iter().map(|c|c.name.as_str()).collect();
+        let column_names: Vec<&str> = table_info.columns.iter().map(|c|c.name.as_str()).collect();
 
-        /*
-        let columns: Vec<(&mi::ColumnInfo, ParsedParameter)> = parameters.iter().map(|(name,value)| {
+        let param_columns_len = parameters.len();
 
-        let column = table_info.columns.iter().find(|c|c.name == name);
+        let mut param_column_names = Vec::with_capacity(param_columns_len);
+        let mut param_columns = Vec::with_capacity(param_columns_len);
+        let mut parsed_params = Vec::with_capacity(param_columns_len);
 
-        if let Some(column) = column {
-            let parsed = ParsedParameter::parse(column.col_type, value.to_string());
-            if let Err(err) = parsed {
-                Err(format!("Can not parse parameter value {} for column {}: {}", value, column.name, err));
-            } else {
-                Ok((column, parsed))
+        for (ref col_name,ref p) in parameters {
+            let column = table_info.columns.iter().find(|c|&c.name == col_name);
+
+            match column {
+                None => return Err(format!("Not found column {}", col_name)),
+                Some(column) => {
+                    let parsed = ParsedParameter::parse(column.col_type, p.to_string());
+                    match parsed {
+                        Err(err) => return Err(format!("Can not parse parameter value {} for column {}: {}", p, col_name, err)),
+                        Ok(parsed) => {
+                            parsed_params.push(parsed);
+                            param_columns.push(ColTypeInfo::new( column ));
+                            param_column_names.push(col_name.to_owned());
+                        }
+                    }
+                }
             }
-        } else {
-            Err(format!("Not found column {}", name))
-        }
-    }).filter_map(|c|c.ok()).collect();
-
-    */
-
-        let mut param_columns = Vec::with_capacity(columns.len());
-        let mut parsed_params = Vec::with_capacity(columns.len());
-
-        for (c,p) in columns {
-            param_columns.push(c);
-            parsed_params.push(p);
         }
 
-        let sql = DynamicQuery::generate_sql(schema_name, table_name, &column_names, &param_column_names);
+        let table_name = format!("{}.{}", schema_name, table_info.name.as_str());
         let column_names = column_names.iter().map(|name|name.to_string()).collect();
 
-        Ok( DynamicQuery { sql, columns, column_names, param_columns, parsed_params } )
+        Ok( DynamicQuery { table_name, columns, column_names, param_columns, param_column_names, parsed_params } )
     }
 
-    pub fn generate_sql(schema_name: &str, table_name: &str, column_names: &Vec<&str>, param_column_names: &Vec<&str>) -> String {
-        let joined_result_columns = column_names.join(",");
+    fn generate_sql(&self) -> String {
+        let joined_result_columns = self.column_names.join(",");
 
         let enumerated_param_columns: Vec<String> =
-            param_column_names.iter().enumerate().map(|(idx,name)|format!("{} = :{}", name, idx+1)).collect();
+            self.param_column_names.iter().enumerate().map(|(idx,name)|format!("{} = :{}", name, idx+1)).collect();
         let joined_param_columns = enumerated_param_columns.join(" AND ");
 
-        format!("SELECT {} FROM {}.{} WHERE {}", joined_result_columns, schema_name,  table_name, joined_param_columns)
+        format!("SELECT {} FROM {} WHERE {}", joined_result_columns, self.table_name, joined_param_columns)
     }
 
     /// execute a query and generate JSON result
@@ -136,10 +134,11 @@ impl DynamicQuery {
     }
 
     fn prepare_query<'conn>(self, conn: &'conn oracle::Connection) -> Result<(oracle::Query<'conn, Vec<ParsedParameter>, String>, Vec<ParsedParameter>), String> {
+        let sql = self.generate_sql();
         let results_provider = Box::new( DynamicResultsProvider { columns: self.columns, column_names: self.column_names } );
         let params_provider = Box::new( DynamicParamsProvider { columns: self.param_columns });
 
-        let stmt = conn.prepare_dynamic(&self.sql, params_provider)
+        let stmt = conn.prepare_dynamic(&sql, params_provider)
             .map_err(|err|format!("Can not prepare statement: {}", err))?;
 
         let query = stmt.query_dynamic(results_provider, 1)

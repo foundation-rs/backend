@@ -10,3 +10,6 @@ edition = "2018"
 chrono = { version = "0.4", features = ["serde"] }
 lazy_static = "1.4.0"
 libc = "0.2"
+
+# see github.com/paupino/rust-decimal
+rust_decimal = "1.8.1"
