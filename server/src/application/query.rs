@@ -1,5 +1,6 @@
 use oracle::{self, ValueProjector};
 use crate::{metainfo as mi, datasource};
+use std::collections::HashMap;
 
 pub struct DynamicQuery {
     table_name:    String,
@@ -8,7 +9,9 @@ pub struct DynamicQuery {
 
     param_columns:      Vec<ColTypeInfo>,
     param_column_names: Vec<String>,
-    parsed_params:      Vec<ParsedParameter>
+    parsed_params:      Vec<ParsedParameter>,
+
+    limit: u16,
 }
 
 struct DynamicResultsProvider {
@@ -57,12 +60,12 @@ impl DynamicQuery {
                 let column_names = column_names.iter().map(|name|name.to_string()).collect();
 
                 ParsedParameter::parse(pk_column.col_type, parameter)
-                    .map(|parsed_parameter|DynamicQuery{table_name, columns, column_names, param_columns: vec![pk_column], param_column_names, parsed_params: vec![parsed_parameter]})
+                    .map(|parsed_parameter|DynamicQuery{table_name, columns, column_names, param_columns: vec![pk_column], param_column_names, parsed_params: vec![parsed_parameter], limit: 1})
             }
         }
     }
 
-    pub fn create_from_params(schema_name: &str, table_info: &mi::TableInfo, parameters: Vec<(String,String)>) -> Result<DynamicQuery, String> {
+    pub fn create_from_params(schema_name: &str, table_info: &mi::TableInfo, parameters: HashMap<String,String>) -> Result<DynamicQuery, String> {
         let columns: Vec<ColTypeInfo> = table_info.columns.iter().map(ColTypeInfo::new).collect();
         let column_names: Vec<&str> = table_info.columns.iter().map(|c|c.name.as_str()).collect();
 
@@ -94,7 +97,7 @@ impl DynamicQuery {
         let table_name = format!("{}.{}", schema_name, table_info.name.as_str());
         let column_names = column_names.iter().map(|name|name.to_string()).collect();
 
-        Ok( DynamicQuery { table_name, columns, column_names, param_columns, param_column_names, parsed_params } )
+        Ok( DynamicQuery { table_name, columns, column_names, param_columns, param_column_names, parsed_params, limit: 25 } )
     }
 
     fn generate_sql(&self) -> String {
@@ -112,7 +115,7 @@ impl DynamicQuery {
         let conn = datasource::get_connection()
             .map_err(|err|format!("Can not connect to oracle: {}", err))?;
 
-        let (query, params) = self.prepare_query(&conn)?;
+        let (query, params) = self.prepare_query(&conn, 1)?;
 
         let result = query.fetch_one(params)
             .map_err(|err|format!("Can not fetch row by pk: {}", err))?;
@@ -125,7 +128,7 @@ impl DynamicQuery {
         let conn = datasource::get_connection()
             .map_err(|err|format!("Can not connect to oracle: {}", err))?;
 
-        let (query, params) = self.prepare_query(&conn)?;
+        let (query, params) = self.prepare_query(&conn, 25)?;
 
         let result = query.fetch_list(params)
             .map_err(|err|format!("Can not fetch row by where clause: {}", err))?.join(",");
@@ -133,15 +136,23 @@ impl DynamicQuery {
         Ok( format!("[{}]", result) )
     }
 
-    fn prepare_query<'conn>(self, conn: &'conn oracle::Connection) -> Result<(oracle::Query<'conn, Vec<ParsedParameter>, String>, Vec<ParsedParameter>), String> {
-        let sql = self.generate_sql();
+    fn prepare_query<'conn>(self, conn: &'conn oracle::Connection, prefetch_rows: usize) -> Result<(oracle::Query<'conn, Vec<ParsedParameter>, String>, Vec<ParsedParameter>), String> {
+        let mut sql = self.generate_sql();
+
+        if (self.limit > 1) {
+            let fetch_clause = format!(" FETCH NEXT {} ROWS ONLY", self.limit);
+            sql.push_str(&fetch_clause);
+        }
+
+        // println!("sql: {}", &sql);
+
         let results_provider = Box::new( DynamicResultsProvider { columns: self.columns, column_names: self.column_names } );
         let params_provider = Box::new( DynamicParamsProvider { columns: self.param_columns });
 
         let stmt = conn.prepare_dynamic(&sql, params_provider)
             .map_err(|err|format!("Can not prepare statement: {}", err))?;
 
-        let query = stmt.query_dynamic(results_provider, 1)
+        let query = stmt.query_dynamic(results_provider, prefetch_rows)
             .map_err(|err|format!("Can not create query from statement: {}", err))?;
 
         Ok((query, self.parsed_params))

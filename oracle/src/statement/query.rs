@@ -41,6 +41,8 @@ impl <'conn,P,R: 'conn> Query<'conn,P,R> {
 
     #[inline]
     pub fn fetch_list(&self, params: P) -> OracleResult<Vec<R>> {
+        println!("prefetch rows: {}", self.prefetch_rows);
+
         assert!(self.prefetch_rows > 1 && self.prefetch_rows <= 100);
         let mut result = Vec::with_capacity(self.prefetch_rows);
 
