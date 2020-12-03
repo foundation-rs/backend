@@ -30,11 +30,12 @@ enum ParsedParameter {
 struct ColTypeInfo {
     pub col_type:      oracle::SqlType,
     pub oci_data_type: oracle::TypeDescriptor,
+    pub nullable:      bool
 }
 
 impl ColTypeInfo {
     fn new(info: &mi::ColumnInfo) -> ColTypeInfo {
-        ColTypeInfo { col_type: info.col_type, oci_data_type: info.oci_data_type }
+        ColTypeInfo { col_type: info.col_type, oci_data_type: info.oci_data_type, nullable: info.nullable }
     }
 }
 
@@ -211,7 +212,7 @@ impl oracle::ResultsProvider<String> for DynamicResultsProvider {
             .zip(self.column_names.iter())
             .zip(rs.iter())
             .map(|((c, name), value)|{
-                let result = value.to_owned().try_to_string(&c.col_type).unwrap_or_else(|err| err.to_string());
+                let result = value.to_owned().try_to_string(&c.col_type, c.nullable).unwrap_or_else(|err| err.to_string());
                 format!("\"{}\":{}", name, result)
             }).collect();
 

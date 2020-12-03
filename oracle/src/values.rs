@@ -226,31 +226,78 @@ fn datetime_to_row(source: &DateTime<Local>, data: *mut u8) -> usize {
 use std::convert::TryFrom;
 
 impl ResultValue {
-    pub fn try_to_string(self, tp: &SqlType) -> Result<String, &'static str> {
+    fn null_value_repr() -> String {
+        "null".to_string()
+    }
+
+    pub fn try_to_string(self, tp: &SqlType, nullable: bool) -> Result<String, &'static str> {
         let result = match tp {
             SqlType::Varchar => {
                 let v: String = self.into();
                 format!("\"{}\"",v)
             },
             SqlType::Int16 => {
-                let v: i16 = self.into();
-                v.to_string()
+                if nullable {
+                    let v: Option<i16> = self.into();
+                    match v {
+                        None => ResultValue::null_value_repr(),
+                        Some (v) => v.to_string()
+                    }
+                } else {
+                    let v: i16 = self.into();
+                    v.to_string()
+                }
             },
             SqlType::Int32 => {
-                let v: i32 = self.into();
-                v.to_string()
+                if nullable {
+                    let v: Option<i32> = self.into();
+                    match v {
+                        None => ResultValue::null_value_repr(),
+                        Some (v) => v.to_string()
+                    }
+                } else {
+                    let v: i32 = self.into();
+                    v.to_string()
+                }
             },
             SqlType::Int64 => {
-                let v: i64 = self.into();
-                v.to_string()
+                if nullable {
+                    let v: Option<i64> = self.into();
+                    match v {
+                        None => ResultValue::null_value_repr(),
+                        Some (v) => v.to_string()
+                    }
+                } else {
+                    let v: i64 = self.into();
+                    v.to_string()
+                }
             },
             SqlType::Float64 => {
-                let v: f64 = self.into();
-                v.to_string()
+                if nullable {
+                    let v: Option<f64> = self.into();
+                    match v {
+                        None => ResultValue::null_value_repr(),
+                        Some (v) => v.to_string()
+                    }
+                } else {
+                    let v: f64 = self.into();
+                    v.to_string()
+                }
             },
             SqlType::DateTime => {
-                let v: SqlDateTime = self.into();
-                format!("\"{}\"", v.to_rfc3339())
+                if nullable {
+                    let v: Option<SqlDateTime> = self.into();
+                    match v {
+                        None => ResultValue::null_value_repr(),
+                        Some (v) => {
+                            let v: SqlDateTime = self.into();
+                            format!("\"{}\"", v.to_rfc3339())
+                        }
+                    }
+                } else {
+                    let v: SqlDateTime = self.into();
+                    format!("\"{}\"", v.to_rfc3339())
+                }
             }
             _ => return Err("\"not-implemented\"")
         };
