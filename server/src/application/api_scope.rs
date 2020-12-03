@@ -42,8 +42,8 @@ async fn table_query_by_pk(path: web::Path<(String,String,String)>, data: web::D
 #[derive(Deserialize)]
 struct QueryParams {
     q:      String,
-    limit:  Option<i16>,
-    offset: Option<i16>,
+    limit:  Option<u16>,
+    offset: Option<u16>,
     order:  Option<String>,
 }
 
@@ -59,7 +59,7 @@ async fn table_query_by_params(path: web::Path<(String,String)>, req: web::Query
             let q: serde_json::error::Result<HashMap<String,String>> = serde_json::from_str(&req.q);
             return match q {
                 Ok(paremeters) => {
-                    let query = query::DynamicQuery::create_from_params(&schema_name, info, paremeters);
+                    let query = query::DynamicQuery::create_from_params(&schema_name, info, paremeters, req.limit, req.offset);
                     return match query {
                         Ok(query) => {
                             let result = query.fetch_many();

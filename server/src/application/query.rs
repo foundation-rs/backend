@@ -11,7 +11,8 @@ pub struct DynamicQuery {
     param_column_names: Vec<String>,
     parsed_params:      Vec<ParsedParameter>,
 
-    limit: u16,
+    limit:  u16,
+    offset: Option<u16>
 }
 
 struct DynamicResultsProvider {
@@ -60,13 +61,21 @@ impl DynamicQuery {
                 let table_name = format!("{}.{}", schema_name, table_info.name.as_str());
                 let column_names = column_names.iter().map(|name|name.to_string()).collect();
 
+                let limit = 1;
+                let offset = Option::None;
+
                 ParsedParameter::parse(pk_column.col_type, parameter)
-                    .map(|parsed_parameter|DynamicQuery{table_name, columns, column_names, param_columns: vec![pk_column], param_column_names, parsed_params: vec![parsed_parameter], limit: 1})
+                    .map(|parsed_parameter|DynamicQuery{table_name, columns, column_names, param_columns: vec![pk_column], param_column_names, parsed_params: vec![parsed_parameter], limit, offset})
             }
         }
     }
 
-    pub fn create_from_params(schema_name: &str, table_info: &mi::TableInfo, parameters: HashMap<String,String>) -> Result<DynamicQuery, String> {
+    pub fn create_from_params(schema_name: &str,
+                              table_info: &mi::TableInfo,
+                              parameters: HashMap<String,String>,
+                              limit: Option<u16>,
+                              offset: Option<u16>
+    ) -> Result<DynamicQuery, String> {
         let columns: Vec<ColTypeInfo> = table_info.columns.iter().map(ColTypeInfo::new).collect();
         let column_names: Vec<&str> = table_info.columns.iter().map(|c|c.name.as_str()).collect();
 
@@ -98,7 +107,22 @@ impl DynamicQuery {
         let table_name = format!("{}.{}", schema_name, table_info.name.as_str());
         let column_names = column_names.iter().map(|name|name.to_string()).collect();
 
-        Ok( DynamicQuery { table_name, columns, column_names, param_columns, param_column_names, parsed_params, limit: 25 } )
+        let limit = limit.unwrap_or(25);
+
+        if limit > 100  {
+            return Err("limit rows must be <= 100".to_string());
+        }
+
+        if let Some(offset) = offset {
+            if offset < limit {
+                return Err("offset must be >= limit".to_string());
+            }
+            if offset % limit > 0 {
+                return Err("offset must be a multiple of the limit (remainder must be zero)".to_string());
+            }
+        }
+
+        Ok( DynamicQuery { table_name, columns, column_names, param_columns, param_column_names, parsed_params, limit, offset } )
     }
 
     fn generate_sql(&self) -> String {
@@ -140,7 +164,11 @@ impl DynamicQuery {
     fn prepare_query<'conn>(self, conn: &'conn oracle::Connection, prefetch_rows: usize) -> Result<(oracle::Query<'conn, Vec<ParsedParameter>, String>, Vec<ParsedParameter>), String> {
         let mut sql = self.generate_sql();
 
-        if (self.limit > 1) {
+        if self.limit > 1 {
+            if let Some(offset) = self.offset {
+                let offset_clause = format!(" OFFSET {} ROWS", offset);
+                sql.push_str(&offset_clause);
+            }
             let fetch_clause = format!(" FETCH NEXT {} ROWS ONLY", self.limit);
             sql.push_str(&fetch_clause);
         }
