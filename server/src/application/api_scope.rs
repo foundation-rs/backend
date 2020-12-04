@@ -24,10 +24,13 @@ async fn table_query_by_pk(path: web::Path<(String,String,String)>, data: web::D
             let query = query::DynamicQuery::create_from_pk(&schema_name, info, pk_params);
             return match query {
                 Ok(query) => {
-                    let result = query.fetch_one();
+                    let result = web::block(move || query.fetch_one()).await;
                     match result {
-                        Ok(r) => HttpResponse::Ok().set(ContentType::json()).body(r),
-                        Err(err) => HttpResponse::InternalServerError().body(err)
+                        Ok(result) => HttpResponse::Ok().set(ContentType::json()).body(result),
+                        Err(e) => {
+                            eprintln!("{:?}",e);
+                            HttpResponse::InternalServerError().finish()
+                        }
                     }
                 },
                 Err(err) => HttpResponse::BadRequest().body(err)
@@ -64,10 +67,13 @@ async fn table_query_by_params(path: web::Path<(String,String)>, req: web::Query
                     let query = query::DynamicQuery::create_from_params(&schema_name, info, paremeters, order, req.limit, req.offset);
                     return match query {
                         Ok(query) => {
-                            let result = query.fetch_many();
+                            let result = web::block(move || query.fetch_many()).await;
                             match result {
-                                Ok(r) => HttpResponse::Ok().set(ContentType::json()).body(r),
-                                Err(err) => HttpResponse::InternalServerError().body(err)
+                                Ok(result) => HttpResponse::Ok().set(ContentType::json()).body(result),
+                                Err(e) => {
+                                    eprintln!("{:?}",e);
+                                    HttpResponse::InternalServerError().finish()
+                                }
                             }
                         },
                         Err(err) => HttpResponse::BadRequest().body(err)

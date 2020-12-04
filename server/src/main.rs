@@ -50,6 +50,7 @@ async fn main() -> std::io::Result<()> {
             .service(application::api_scope())
             .service( application::base_scope())
     })
+        .keep_alive(75)
         .bind_openssl(&http.listen, builder)?
         .run()
         .await
