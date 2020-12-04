@@ -15,12 +15,13 @@ pub fn api_scope() -> Scope {
 
 #[get("/schemas/{schema}/{table}/{pk}")]
 async fn table_query_by_pk(path: web::Path<(String,String,String)>, data: web::Data<Arc<ApplicationState>>) -> impl Responder {
-    let (schema_name,table_name, primary_key) = path.into_inner();
+    let (schema_name,table_name, pk_params) = path.into_inner();
     let metainfo = data.metainfo.read().unwrap();
 
     if let Some(info) = metainfo.schemas.get(schema_name.as_str()) {
         if let Some(info) = info.tables.get(table_name.as_str()) {
-            let query = query::DynamicQuery::create_from_pk(&schema_name, info, primary_key);
+            let pk_params: Vec<String> = pk_params.split(",").map(|s|s.to_string()).collect();
+            let query = query::DynamicQuery::create_from_pk(&schema_name, info, pk_params);
             return match query {
                 Ok(query) => {
                     let result = query.fetch_one();
@@ -54,12 +55,13 @@ async fn table_query_by_params(path: web::Path<(String,String)>, req: web::Query
 
     if let Some(info) = metainfo.schemas.get(schema_name.as_str()) {
         if let Some(info) = info.tables.get(table_name.as_str()) {
-            println!("{}.{}; q: {}", schema_name, table_name, req.q);
+            // println!("{}.{}; q: {}", schema_name, table_name, req.q);
 
             let q: serde_json::error::Result<HashMap<String,String>> = serde_json::from_str(&req.q);
             return match q {
                 Ok(paremeters) => {
-                    let query = query::DynamicQuery::create_from_params(&schema_name, info, paremeters, req.limit, req.offset);
+                    let order: Vec<String> = req.order.as_ref().map(|s|s.split(",").map(|s|s.to_string()).collect()).unwrap_or(vec![]);
+                    let query = query::DynamicQuery::create_from_params(&schema_name, info, paremeters, order, req.limit, req.offset);
                     return match query {
                         Ok(query) => {
                             let result = query.fetch_many();

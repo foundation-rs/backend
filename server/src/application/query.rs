@@ -12,7 +12,8 @@ pub struct DynamicQuery {
     parsed_params:      Vec<ParsedParameter>,
 
     limit:  u16,
-    offset: Option<u16>
+    offset: Option<u16>,
+    order_column_names: Vec<String>,
 }
 
 struct DynamicResultsProvider {
@@ -41,22 +42,38 @@ impl ColTypeInfo {
 }
 
 impl DynamicQuery {
-    pub fn create_from_pk(schema_name: &str, table_info: &mi::TableInfo, parameter: String) -> Result<DynamicQuery, &'static str> {
+    pub fn create_from_pk(schema_name: &str, table_info: &mi::TableInfo, pk_params: Vec<String>) -> Result<DynamicQuery, String> {
         match &table_info.primary_key {
-            None => Err("Primary key not exists"),
+            None => Err("Primary key not exists".to_string()),
             Some(pk) => {
                 let pk_indices = &pk.column_indices;
-                if pk_indices.len() > 1 {
-                    return Err("Primary key must have only ONE column")
+
+                let param_columns_len = pk_params.len();
+
+                if param_columns_len != pk_indices.len() {
+                    return Err("Count of columns in primary key does not match with count of parameters in query".to_string())
                 }
-                let pk_column_index = unsafe { pk_indices.get_unchecked(0) };
-                let pk_column = unsafe { table_info.columns.get_unchecked(*pk_column_index) };
 
                 let columns: Vec<ColTypeInfo> = table_info.columns.iter().map(ColTypeInfo::new).collect();
                 let column_names: Vec<&str> = table_info.columns.iter().map(|c|c.name.as_str()).collect();
 
-                let param_column_names = vec![pk_column.name.clone()];
-                let pk_column = ColTypeInfo::new( pk_column );
+                let mut param_column_names = Vec::with_capacity(param_columns_len);
+                let mut param_columns = Vec::with_capacity(param_columns_len);
+                let mut parsed_params = Vec::with_capacity(param_columns_len);
+
+                for (pk_column_index, p) in pk.column_indices.iter().zip(pk_params) {
+                    let pk_column = unsafe { table_info.columns.get_unchecked(*pk_column_index) };
+
+                    let parsed = ParsedParameter::parse(pk_column.col_type, p.to_string());
+                    match parsed {
+                        Err(err) => return Err(format!("Can not parse parameter value {} for column {}: {}", p, pk_column.name, err)),
+                        Ok(parsed) => {
+                            parsed_params.push(parsed);
+                            param_columns.push(ColTypeInfo::new( pk_column ));
+                            param_column_names.push(pk_column.name.to_owned());
+                        }
+                    }
+                };
 
                 let table_name = format!("{}.{}", schema_name, table_info.name.as_str());
                 let column_names = column_names.iter().map(|name|name.to_string()).collect();
@@ -64,17 +81,20 @@ impl DynamicQuery {
                 let limit = 1;
                 let offset = Option::None;
 
-                ParsedParameter::parse(pk_column.col_type, parameter)
-                    .map(|parsed_parameter|DynamicQuery{table_name, columns, column_names, param_columns: vec![pk_column], param_column_names, parsed_params: vec![parsed_parameter], limit, offset})
+                Ok( DynamicQuery {
+                    table_name, columns, column_names,
+                    param_columns, param_column_names, parsed_params,
+                    limit, offset, order_column_names: vec![] } )
             }
         }
     }
 
     pub fn create_from_params(schema_name: &str,
-                              table_info: &mi::TableInfo,
-                              parameters: HashMap<String,String>,
-                              limit: Option<u16>,
-                              offset: Option<u16>
+                              table_info:  &mi::TableInfo,
+                              parameters:  HashMap<String,String>,
+                              order:       Vec<String>,
+                              limit:       Option<u16>,
+                              offset:      Option<u16>
     ) -> Result<DynamicQuery, String> {
         let columns: Vec<ColTypeInfo> = table_info.columns.iter().map(ColTypeInfo::new).collect();
         let column_names: Vec<&str> = table_info.columns.iter().map(|c|c.name.as_str()).collect();
@@ -105,6 +125,14 @@ impl DynamicQuery {
         }
 
         let table_name = format!("{}.{}", schema_name, table_info.name.as_str());
+
+        for col_name in &order {
+            let column = table_info.columns.iter().find(|c|&c.name == col_name);
+            if column.is_none() {
+                return Err(format!("Order column {} nof found in table {}", col_name, &table_name))
+            }
+        };
+
         let column_names = column_names.iter().map(|name|name.to_string()).collect();
 
         let limit = limit.unwrap_or(25);
@@ -122,7 +150,10 @@ impl DynamicQuery {
             }
         }
 
-        Ok( DynamicQuery { table_name, columns, column_names, param_columns, param_column_names, parsed_params, limit, offset } )
+        Ok( DynamicQuery {
+            table_name, columns, column_names,
+            param_columns, param_column_names, parsed_params,
+            limit, offset, order_column_names: order } )
     }
 
     fn generate_sql(&self) -> String {
@@ -163,6 +194,12 @@ impl DynamicQuery {
 
     fn prepare_query<'conn>(self, conn: &'conn oracle::Connection, prefetch_rows: usize) -> Result<(oracle::Query<'conn, Vec<ParsedParameter>, String>, Vec<ParsedParameter>), String> {
         let mut sql = self.generate_sql();
+
+        if self.order_column_names.len() > 0 {
+            let joined_order_columns = self.order_column_names.join(",");
+            let order_clause = format!(" ORDER BY {}", joined_order_columns);
+            sql.push_str(&order_clause);
+        }
 
         if self.limit > 1 {
             if let Some(offset) = self.offset {
