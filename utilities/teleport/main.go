@@ -18,8 +18,8 @@ func main() {
 	fmt.Println("executable path: " + executablePath)
 	fmt.Println("      home path: " + homePath)
 
-	// inventory := LoadInventory(homePath + Separator + ".inventory.yaml")
-	inventory := LoadInventory(executablePath + Separator + ".inventory.yaml")
+	inventory := LoadInventory(homePath + Separator + ".inventory.yaml")
+	// inventory := LoadInventory(executablePath + Separator + ".inventory.yaml")
 
 	var variables = map[string]Variable{
 		"@HOME": Variable{Description: "User Home", Path: homePath},
