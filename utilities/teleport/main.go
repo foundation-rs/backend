@@ -22,9 +22,9 @@ func main() {
 	// inventory := LoadInventory(executablePath + Separator + ".inventory.yaml")
 
 	var variables = map[string]Variable{
-		"@HOME": Variable{Description: "User Home", Path: homePath},
-		"@DESK": Variable{Description: "Desktop", Path: homePath + Separator + "Desktop"},
-		"@DOCS": Variable{Description: "Documents", Path: homePath + Separator + "Documents"},
+		"@HOME": {Description: "User Home", Path: homePath},
+		"@DESK": {Description: "Desktop", Path: homePath + Separator + "Desktop"},
+		"@DOCS": {Description: "Documents", Path: homePath + Separator + "Documents"},
 	}
 
 	if len(os.Args) < 3 {
@@ -79,7 +79,12 @@ func Upload(
 
 	contentPath = filepath.Join(expandTemplate(contentPath, regex, variables), serverConfig.PathPrefix)
 
-	if err := UploadExecutor(sftpClient, contentPath, source, "./"); err != nil {
+	var destination = "./"
+	if serverConfig.DestPrefix != "" {
+		destination = serverConfig.DestPrefix + "/"
+	}
+
+	if err := UploadExecutor(sftpClient, contentPath, source, destination); err != nil {
 		color.Red.Printf("%s\n", err)
 	}
 }

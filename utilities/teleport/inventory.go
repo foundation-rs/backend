@@ -20,6 +20,7 @@ type ServerConfig struct {
 	Password    string `yaml:"password"`
 	Description string `yaml:"description"`
 	PathPrefix  string `yaml:"path-prefix"`
+	DestPrefix  string `yaml:"dest-prefix"`
 }
 
 // LoadInventory load inventory from specified filepath

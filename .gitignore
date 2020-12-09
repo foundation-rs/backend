@@ -1,8 +1,6 @@
 /.idea
 /target
 **/node_modules
-www/**
-/www/
 /bin
 bin/**
 /distribution

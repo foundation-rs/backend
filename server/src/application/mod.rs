@@ -40,17 +40,19 @@ impl ApplicationState {
 pub fn base_scope() -> Scope {
     web::scope("/")
         .service(health)
+        /*
         .service(fs::Files::new("/", "./www")
             .show_files_listing()
             .use_last_modified(true))
         .default_service(web::resource("").route(web::get().to(index)))
+         */
 }
-
+/*
 async fn index() -> Result<NamedFile> {
     let path: PathBuf = "./www/index.html".parse().unwrap();
     Ok(NamedFile::open(path)?)
 }
-
+*/
 #[get("/health")]
 async fn health() -> impl Responder {
     "OK".to_string()
