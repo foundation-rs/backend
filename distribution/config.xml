@@ -1,0 +1,34 @@
+<config>
+  <connection url="oracle-linux.apa-canal.md:1521/ACC"
+              user="SYSTEM"
+              pw="env:SYSTEM_PASSWORD"
+  />
+  <http>
+    <listen>
+      0.0.0.0:8443
+    </listen>
+    <ssl>
+      <path><![CDATA[/certs]]></path>
+      <keyfile>internal.key</keyfile>
+      <certfile>internal.crt</certfile>
+    </ssl>
+  </http>
+  <excludes>
+    <schema>APEX_040200</schema>
+    <schema>APPQOSSYS</schema>
+    <schema>AUDSYS</schema>
+    <schema>COPIE</schema>
+    <schema>CTXSYS</schema>
+    <schema>DBSNMP</schema>
+    <schema>GSMADMIN_INTERNAL</schema>
+    <schema>FLOWS_FILES</schema>
+    <schema>MDSYS</schema>
+    <schema>OJVMSYS</schema>
+    <schema>ORDDATA</schema>
+    <schema>ORDSYS</schema>
+    <schema>SYS</schema>
+    <schema>SYSTEM</schema>
+    <schema>WMSYS</schema>
+    <schema>XDB</schema>
+  </excludes>
+</config>
