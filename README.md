@@ -1,4 +1,4 @@
-# foundation
+# server
 Automatized application server on Rust for Oracle
 
 ## oracle
