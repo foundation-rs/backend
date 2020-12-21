@@ -9,9 +9,9 @@ use crate::application;
 use actix_web::dev::HttpServiceFactory;
 
 // group of endpoints for api
-pub fn api_scope() -> impl HttpServiceFactory {
+pub fn api_scope(security: application::Security) -> impl HttpServiceFactory {
     web::scope("/api")
-        .wrap(application::Security::new())
+        .wrap(security)
         .service(table_query_by_pk)
         .service(table_query_by_params)
 }

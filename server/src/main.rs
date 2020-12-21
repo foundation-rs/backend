@@ -32,6 +32,7 @@ async fn main() -> std::io::Result<()> {
 
     let http = &conf.http;
     let builder = setup::ssl(&http);
+    let security = setup::security(&http);
 
     datasource::create(&conf.connection)
         .map_err(|e|Error::new(ErrorKind::Other, e))?;
@@ -46,8 +47,8 @@ async fn main() -> std::io::Result<()> {
             .wrap(StructuredLogger::new(log.clone()))
             .wrap(middleware::Compress::new(ContentEncoding::Br))
 
-            .service(application::management_scope())
-            .service(application::api_scope())
+            .service(application::management_scope(security.clone()))
+            .service(application::api_scope(security.clone()))
             .service( application::base_scope())
     })
         .keep_alive(75)

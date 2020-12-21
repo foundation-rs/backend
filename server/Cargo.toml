@@ -13,6 +13,8 @@ oracle_derive = { version = "0.1.0", path = "../oracle_derive" }
 actix-web = { version = "3", features = ["openssl"] }
 actix-files = "0.4"
 actix-slog = "0.2.1"
+## cookie = "0.14"
+jsonwebtoken = "7.2.0"
 slog = "2.5.2"
 slog-async = "2.5.0"
 slog-term = "2.6.0"

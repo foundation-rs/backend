@@ -7,9 +7,9 @@ use crate::application;
 use actix_web::dev::HttpServiceFactory;
 
 // group of endpoints for metainfo
-pub fn management_scope() -> impl HttpServiceFactory {
+pub fn management_scope(security: application::Security) -> impl HttpServiceFactory {
     web::scope("/mgmt")
-        .wrap(application::Security::new())
+        .wrap(security)
         .service(schemas_metainfo)
         .service(tables_metainfo)
         .service(table_metainfo)

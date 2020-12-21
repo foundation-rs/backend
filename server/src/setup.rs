@@ -5,6 +5,9 @@ use slog::{Drain,o};
 use openssl::ssl::{SslAcceptorBuilder, SslAcceptor, SslMethod, SslFiletype};
 use std::path::Path;
 use crate::config::HTTP;
+use crate::application;
+use std::fs::File;
+use std::io::Read;
 
 /// setup logging
 // TODO: use logger everywhere
@@ -36,5 +39,16 @@ pub fn ssl(http: &HTTP) -> SslAcceptorBuilder {
         .unwrap();
     builder.set_certificate_chain_file(certfilepath).unwrap();
     builder
+}
+
+pub fn security(http: &HTTP) -> application::Security {
+    let ssl = &http.ssl;
+    let jwt = &http.jwt;
+    let token_name = jwt.cookie.to_string();
+
+    let keypath = Path::new(&ssl.path);
+    let keyfilepath = keypath.join(&jwt.publickey);
+
+    application::Security::new(token_name, keyfilepath)
 }
 
