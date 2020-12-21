@@ -30,6 +30,7 @@ pub struct Excludes {
 pub struct HTTP {
     pub listen: String,
     pub ssl:    SSL,
+    pub jwt:    JWT
 }
 
 #[derive(Deserialize, Debug, PartialEq)]
@@ -37,6 +38,13 @@ pub struct SSL {
     pub path:     String,
     pub keyfile:  String,
     pub certfile: String,
+}
+
+#[derive(Deserialize, Debug, PartialEq)]
+pub struct JWT {
+    pub cookie:    String,
+    pub issuer:    String,
+    pub publickey: String,
 }
 
 pub fn load(filename: &str) -> Result<Config, String> {

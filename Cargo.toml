@@ -15,6 +15,8 @@ lto = true        # Enable link Time Optimization
 panic = 'abort'   # Abort on panic
 codegen-units = 2 # Parallel Codegeneration (default: 16)
 
+## need install libssl-dev
+
 ## build for release: cargo build --release
 ## for full minification (strip debug symbols):
 ## strip target/release/server

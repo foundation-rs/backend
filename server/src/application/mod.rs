@@ -1,6 +1,7 @@
 mod mgmt_scope;
 mod api_scope;
 mod query;
+mod security;
 
 use std::sync::{Arc, RwLock};
 use std::io::{Error, ErrorKind, Result};
@@ -21,6 +22,7 @@ use std::path::PathBuf;
 
 pub use mgmt_scope::management_scope;
 pub use api_scope::api_scope;
+pub use security::Security;
 
 // This struct represents state
 pub struct ApplicationState {

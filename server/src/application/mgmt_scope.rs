@@ -3,10 +3,13 @@ use actix_web::{get, web, Scope, Responder, HttpResponse};
 use serde::Serialize;
 
 use crate::application::ApplicationState;
+use crate::application;
+use actix_web::dev::HttpServiceFactory;
 
 // group of endpoints for metainfo
-pub fn management_scope() -> Scope {
+pub fn management_scope() -> impl HttpServiceFactory {
     web::scope("/mgmt")
+        .wrap(application::Security::new())
         .service(schemas_metainfo)
         .service(tables_metainfo)
         .service(table_metainfo)

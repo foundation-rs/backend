@@ -12,6 +12,11 @@
       <keyfile>internal-devel.key</keyfile>
       <certfile>internal-devel.crt</certfile>
     </ssl>
+    <jwt>
+      <cookie>X-Authorization-Token</cookie>
+      <issuer>https://sia.acc.md/using-jwt-rbac</issuer>
+      <publickey>jwt-public-key.pem</publickey>
+    </jwt>
   </http>
   <excludes>
     <schema>APEX_040200</schema>
