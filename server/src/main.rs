@@ -11,6 +11,7 @@ mod datasource;
 mod metainfo;
 mod setup;
 mod utils;
+mod security;
 
 // TODO: threadlocal: https://doc.rust-lang.org/std/macro.thread_local.html
 
@@ -32,7 +33,7 @@ async fn main() -> std::io::Result<()> {
 
     let http = &conf.http;
     let builder = setup::ssl(&http);
-    let security = setup::security(&http);
+    let identityService = setup::identity(&http);
 
     datasource::create(&conf.connection)
         .map_err(|e|Error::new(ErrorKind::Other, e))?;
@@ -46,9 +47,10 @@ async fn main() -> std::io::Result<()> {
             .data(application.clone())
             .wrap(StructuredLogger::new(log.clone()))
             .wrap(middleware::Compress::new(ContentEncoding::Br))
+            .wrap(identityService.clone())
 
-            .service(application::management_scope(security.clone()))
-            .service(application::api_scope(security.clone()))
+            .service(application::management_scope())
+            .service(application::api_scope())
             .service( application::base_scope())
     })
         .keep_alive(75)

@@ -41,7 +41,7 @@ pub fn ssl(http: &HTTP) -> SslAcceptorBuilder {
     builder
 }
 
-pub fn security(http: &HTTP) -> application::Security {
+pub fn identity(http: &HTTP) -> crate::security::IdentityService {
     let ssl = &http.ssl;
     let jwt = &http.jwt;
     let token_name = jwt.cookie.to_string();
@@ -49,6 +49,6 @@ pub fn security(http: &HTTP) -> application::Security {
     let keypath = Path::new(&ssl.path);
     let keyfilepath = keypath.join(&jwt.publickey);
 
-    application::Security::new(token_name, keyfilepath)
+    crate::security::IdentityService::new(token_name, keyfilepath)
 }
 

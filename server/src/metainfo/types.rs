@@ -94,7 +94,7 @@ pub struct ColumnInfo {
     pub name:           String,
     pub col_type:       SqlType,
     pub oci_data_type:  oracle::TypeDescriptor,
-    pub col_type_name:  String, // type name in typescript
+    pub col_type_name:  &'static str, // type name in typescript
     pub nullable:       bool
 }
 
@@ -132,13 +132,13 @@ impl TryFrom<OraTableColumn> for ColumnInfo {
         let (col_type, oci_data_type, col_type_name) = {
             match ora_type_name {
                 "CHAR" | "VARCHAR2" => {
-                    (SqlType::Varchar, ((SqlType::Varchar, col_len as usize)).into(), "string".to_owned())
+                    (SqlType::Varchar, ((SqlType::Varchar, col_len as usize)).into(), "string")
                 },
                 "LONG" => {
-                    (SqlType::Varchar, SqlType::Long.into(), "string".to_owned())
+                    (SqlType::Varchar, SqlType::Long.into(), "string")
                 },
                 "DATE" => {
-                    (SqlType::DateTime, SqlType::DateTime.into(), "string".to_owned())
+                    (SqlType::DateTime, SqlType::DateTime.into(), "string")
                 },
                 /*
                 "CLOB" => {
@@ -151,19 +151,19 @@ impl TryFrom<OraTableColumn> for ColumnInfo {
                 },
                  */
                 "NUMBER" => {
-                    let col_type =
+                    let (col_type, col_type_name) =
                         if data_scale == 0 {
                             if data_precision == 0 || data_precision > 7 {
-                                SqlType::Int64
+                                (SqlType::Int64, "integer")
                             } else if data_precision > 4 {
-                                SqlType::Int32
+                                (SqlType::Int32, "integer")
                             } else {
-                                SqlType::Int16
+                                (SqlType::Int16, "integer")
                             }
                         } else {
-                            SqlType::Float64
+                            (SqlType::Float64,"number")
                         };
-                    (col_type, col_type.into(), "number".to_owned())
+                    (col_type, col_type.into(), col_type_name)
                 },
                 _ => {
                     // Unsupported
